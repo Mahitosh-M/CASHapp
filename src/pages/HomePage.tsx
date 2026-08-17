@@ -1,14 +1,15 @@
 import {
-  ArrowRightLeft,
+  ArrowDownLeft,
+  ArrowUpRight,
   IndianRupee,
   Landmark,
   ReceiptIndianRupee,
   ReceiptText,
-  TrendingDown,
-  TrendingUp
+  TrendingDown
 } from 'lucide-react';
 import { useEffect, useState, type FormEvent } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
+import { CashFlowArrows } from '../components/CashFlowArrows';
 import { WholeRupeeInput } from '../components/WholeRupeeInput';
 import { useAuth } from '../context/AuthContext';
 import { useCash } from '../context/CashContext';
@@ -134,7 +135,7 @@ export const HomePage = () => {
           <span>Add expense</span>
         </button>
         <button className="quick-action-tile transfer-action" type="button" onClick={() => navigate('/transfer')} disabled={!canUseBalance}>
-          <span className="quick-action-icon" aria-hidden="true"><ArrowRightLeft size={29} /></span>
+          <span className="quick-action-icon" aria-hidden="true"><CashFlowArrows size={24} /></span>
           <span>Transfer money</span>
         </button>
       </section>
@@ -169,7 +170,7 @@ export const HomePage = () => {
       ) : null}
 
       <section className="summary-grid" aria-label="Cash totals">
-        <button className="summary-item" type="button" onClick={() => navigate('/history/collections')}>
+        <button className="summary-item collection-tone" type="button" onClick={() => navigate('/history/collections')}>
           <ReceiptText size={20} />
           <span>Collections</span>
           <strong>{formatMoney(summary?.totalCollections ?? 0)}</strong>
@@ -180,12 +181,12 @@ export const HomePage = () => {
           <strong>{formatMoney(summary?.totalExpenses ?? 0)}</strong>
         </button>
         <button className="summary-item incoming-tone" type="button" onClick={() => navigate('/history/transfers-in')}>
-          <TrendingUp size={20} />
+          <ArrowDownLeft size={20} />
           <span>Transferred in</span>
           <strong>{formatMoney(summary?.totalTransferredIn ?? 0)}</strong>
         </button>
         <button className="summary-item outgoing-tone" type="button" onClick={() => navigate('/history/transfers-out')}>
-          <ArrowRightLeft size={20} />
+          <ArrowUpRight size={20} />
           <span>Transferred out</span>
           <strong>{formatMoney(summary?.totalTransferredOut ?? 0)}</strong>
         </button>

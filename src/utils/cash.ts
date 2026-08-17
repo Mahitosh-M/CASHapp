@@ -149,10 +149,13 @@ const historyTime = (item: CashHistoryItem) => {
   return item.createdAt.toMillis();
 };
 
-export const mergeRecentHistory = (groups: CashHistoryItem[][], maximum = 20) => groups
+export const sortCashHistory = (groups: CashHistoryItem[][]) => groups
   .flat()
-  .sort((left, right) => historyTime(right) - historyTime(left))
-  .slice(0, maximum);
+  .sort((left, right) => historyTime(right) - historyTime(left));
+
+export const mergeRecentHistory = (groups: CashHistoryItem[][], maximum = 20) => (
+  sortCashHistory(groups).slice(0, maximum)
+);
 
 export const createEmptyShopSummary = (shopId: ShopId): ShopCashSummary => ({
   shopId,

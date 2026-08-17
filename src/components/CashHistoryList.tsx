@@ -1,4 +1,4 @@
-import { ArrowDownLeft, ArrowUpRight, CircleMinus, CirclePlus, IndianRupee, ReceiptText } from 'lucide-react';
+import { ArrowDownLeft, ArrowUpRight, CircleMinus, CirclePlus, IndianRupee, Pencil, ReceiptText } from 'lucide-react';
 import type { CashHistoryItem } from '../types';
 import { formatMoney } from '../utils/cash';
 
@@ -29,7 +29,13 @@ const ActivityIcon = ({ kind }: { kind: CashHistoryItem['kind'] }) => {
   return <ReceiptText size={21} />;
 };
 
-export const CashHistoryList = ({ items }: { items: CashHistoryItem[] }) => (
+export const CashHistoryList = ({
+  items,
+  onEditTransfer
+}: {
+  items: CashHistoryItem[];
+  onEditTransfer?: (transferId: string) => void;
+}) => (
   <div className="history-list">
     {items.map((item) => {
       const positive = item.kind === 'collection' || item.kind === 'transfer-in' || item.kind === 'adjustment-in';
@@ -41,7 +47,20 @@ export const CashHistoryList = ({ items }: { items: CashHistoryItem[] }) => (
             {item.detail ? <span>{item.detail}</span> : null}
             <time>{formatActivityTime(item)}</time>
           </div>
-          <div className="history-amount">{positive ? '+' : '-'} {formatMoney(item.amount)}</div>
+          <div className="history-side">
+            <div className="history-amount">{positive ? '+' : '-'} {formatMoney(item.amount)}</div>
+            {item.kind === 'transfer-out' && onEditTransfer ? (
+              <button
+                className="icon-button history-edit-button"
+                type="button"
+                onClick={() => onEditTransfer(item.id)}
+                title="Edit transfer"
+                aria-label={`Edit transfer of ${formatMoney(item.amount)}`}
+              >
+                <Pencil size={17} />
+              </button>
+            ) : null}
+          </div>
         </article>
       );
     })}

@@ -1,6 +1,7 @@
-import { ArrowRight, ArrowRightLeft, IndianRupee } from 'lucide-react';
+import { IndianRupee } from 'lucide-react';
 import { useRef, useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { CashFlowArrows } from '../components/CashFlowArrows';
 import { PageHeader } from '../components/PageHeader';
 import { WholeRupeeInput } from '../components/WholeRupeeInput';
 import { useAuth } from '../context/AuthContext';
@@ -101,7 +102,7 @@ export const TransferPage = () => {
       <form className="cash-form" onSubmit={handlePrepare}>
         <div className="transfer-route" aria-label="Transfer route">
           <div><span>FROM</span><strong>{currentShopId ? getShopName(currentShopId) : '-'}</strong></div>
-          <ArrowRight size={23} />
+          <CashFlowArrows className="transfer-route-arrows" size={20} />
           <div><span>TO</span><strong>{destinationShopId ? getShopName(destinationShopId) : '-'}</strong></div>
         </div>
 
@@ -142,14 +143,14 @@ export const TransferPage = () => {
           type="submit"
           disabled={submitting || !online || !summary || !isShopCashInitialized(summary)}
         >
-          <ArrowRightLeft size={21} /> Transfer
+          <CashFlowArrows className="button-cash-flow-arrows" size={18} /> Transfer
         </button>
       </form>
 
       {confirming ? (
         <div className="modal-backdrop" role="presentation">
           <section className="confirm-dialog" role="dialog" aria-modal="true" aria-labelledby="confirm-transfer-title">
-            <div className="confirm-icon"><ArrowRightLeft size={27} /></div>
+            <div className="confirm-icon transfer-confirm-icon"><CashFlowArrows size={20} /></div>
             <h2 id="confirm-transfer-title">Confirm transfer</h2>
             <p>Transfer <strong>{formatMoney(amount)}</strong> from {getShopName(currentShopId!)} to {getShopName(destinationShopId!)}?</p>
             <div className="dialog-actions">

@@ -6,6 +6,7 @@ import { CashProvider } from './context/CashContext';
 import { ExpensePage } from './pages/ExpensePage';
 import { AdminPage } from './pages/AdminPage';
 import { CategoryHistoryPage } from './pages/CategoryHistoryPage';
+import { EditTransferPage } from './pages/EditTransferPage';
 import { HistoryPage } from './pages/HistoryPage';
 import { HomePage } from './pages/HomePage';
 import { LoginPage } from './pages/LoginPage';
@@ -24,6 +25,7 @@ const AppRoutes = () => {
           <Route index element={<HomePage />} />
           <Route path="expense" element={<ExpensePage />} />
           <Route path="transfer" element={<TransferPage />} />
+          <Route path="transfer/:transferId/edit" element={<EditTransferPage />} />
           <Route path="history" element={<HistoryPage />} />
           <Route path="history/:category" element={<CategoryHistoryPage />} />
           <Route path="admin" element={profile.role === 'Admin' ? <AdminPage /> : <Navigate to="/" replace />} />

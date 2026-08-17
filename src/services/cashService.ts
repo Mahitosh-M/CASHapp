@@ -8,12 +8,12 @@ import {
   limit,
   orderBy,
   query,
+  runTransaction,
   serverTimestamp,
-  startAfter,
   where,
   writeBatch,
   type DocumentData,
-  type Query,
+  type QueryConstraint,
   type QueryDocumentSnapshot
 } from 'firebase/firestore';
 import { db } from '../firebase';
@@ -25,10 +25,12 @@ import type {
   CashHistoryItem,
   ShopCashSummary,
   ShopId,
-  ShopTransferInput
+  ShopTransferInput,
+  ShopTransferRecord,
+  ShopTransferUpdateInput
 } from '../types';
-import { createEmptyShopSummary, mergeRecentHistory } from '../utils/cash';
-import { getShopName } from '../utils/shops';
+import { createEmptyShopSummary, sortCashHistory } from '../utils/cash';
+import { getShopName, isShopId } from '../utils/shops';
 
 const SHOP_CASH = 'shopCash';
 const CASH_EXPENSES = 'cashExpenses';
@@ -36,17 +38,7 @@ const SHOP_TRANSFERS = 'shopTransfers';
 const CASH_ADJUSTMENTS = 'cashAdjustments';
 const CASH_INITIALIZATIONS = 'cashInitializations';
 const PAYMENTS = 'payments';
-const HISTORY_QUERY_LIMIT = 10;
-const HISTORY_DISPLAY_LIMIT = 20;
-export const CATEGORY_HISTORY_PAGE_SIZE = 50;
-
-export type CashHistoryCursor = QueryDocumentSnapshot<DocumentData>;
-
-export interface CashHistoryPage {
-  items: CashHistoryItem[];
-  nextCursor: CashHistoryCursor | null;
-  hasMore: boolean;
-}
+export const INSUFFICIENT_TRANSFER_EDIT_BALANCE = 'The sending shop does not have enough available amount for this increase.';
 
 const numberOrZero = (value: unknown) => {
   const number = Number(value);
@@ -56,6 +48,31 @@ const numberOrZero = (value: unknown) => {
 const historyDateOrNull = (value: unknown) => {
   if (value instanceof Timestamp) return value;
   return typeof value === 'string' && value ? value : null;
+};
+
+const historyDateAsDate = (value: unknown) => {
+  const historyDate = historyDateOrNull(value);
+  if (!historyDate) return null;
+  const date = typeof historyDate === 'string' ? new Date(historyDate) : historyDate.toDate();
+  return Number.isNaN(date.getTime()) ? null : date;
+};
+
+const mapTransferRecord = (id: string, data: DocumentData): ShopTransferRecord | null => {
+  if (!isShopId(data.fromShopId) || !isShopId(data.toShopId) || data.fromShopId === data.toShopId) return null;
+  const amount = numberOrZero(data.amount);
+  if (amount <= 0) return null;
+
+  return {
+    id,
+    fromShopId: data.fromShopId,
+    toShopId: data.toShopId,
+    amount,
+    note: String(data.note || ''),
+    createdBy: String(data.createdBy || ''),
+    createdAt: historyDateOrNull(data.createdAt),
+    updatedAt: historyDateOrNull(data.updatedAt),
+    updatedBy: typeof data.updatedBy === 'string' ? data.updatedBy : undefined
+  };
 };
 
 export const createExpenseId = () => doc(collection(db, CASH_EXPENSES)).id;
@@ -155,6 +172,76 @@ export const createTransfer = async (input: ShopTransferInput) => {
   await batch.commit();
 };
 
+export const getTransfer = async (transferId: string): Promise<ShopTransferRecord | null> => {
+  const transferSnapshot = await getDoc(doc(db, SHOP_TRANSFERS, transferId));
+  return transferSnapshot.exists()
+    ? mapTransferRecord(transferSnapshot.id, transferSnapshot.data())
+    : null;
+};
+
+export const updateTransfer = async (input: ShopTransferUpdateInput) => runTransaction(db, async (transaction) => {
+  const transferRef = doc(db, SHOP_TRANSFERS, input.id);
+  const transferSnapshot = await transaction.get(transferRef);
+  const existing = transferSnapshot.exists()
+    ? mapTransferRecord(transferSnapshot.id, transferSnapshot.data())
+    : null;
+  if (!existing) throw new Error('Transfer entry was not found.');
+
+  const amountDifference = input.amount - existing.amount;
+  const updatedAt = new Date().toISOString();
+
+  if (amountDifference !== 0) {
+    const senderRef = doc(db, SHOP_CASH, existing.fromShopId);
+    const receiverRef = doc(db, SHOP_CASH, existing.toShopId);
+    const senderSnapshot = await transaction.get(senderRef);
+    const receiverSnapshot = await transaction.get(receiverRef);
+    if (!senderSnapshot.exists() || !receiverSnapshot.exists()) {
+      throw new Error('Both shop balances must be initialized before editing this transfer.');
+    }
+
+    const sender = senderSnapshot.data();
+    const receiver = receiverSnapshot.data();
+    if (!sender.initializedAt || !receiver.initializedAt) {
+      throw new Error('Both shop balances must be initialized before editing this transfer.');
+    }
+
+    const nextSenderBalance = numberOrZero(sender.availableBalance) - amountDifference;
+    if (amountDifference > 0 && nextSenderBalance < 0) {
+      throw new Error(INSUFFICIENT_TRANSFER_EDIT_BALANCE);
+    }
+
+    transaction.update(senderRef, {
+      availableBalance: nextSenderBalance,
+      totalTransferredOut: numberOrZero(sender.totalTransferredOut) + amountDifference,
+      lastCashOperationId: input.id,
+      lastCashOperationType: 'transfer_edit',
+      updatedAt
+    });
+    transaction.update(receiverRef, {
+      availableBalance: numberOrZero(receiver.availableBalance) + amountDifference,
+      totalTransferredIn: numberOrZero(receiver.totalTransferredIn) + amountDifference,
+      lastCashOperationId: input.id,
+      lastCashOperationType: 'transfer_edit',
+      updatedAt
+    });
+  }
+
+  transaction.update(transferRef, {
+    amount: input.amount,
+    note: input.note.trim(),
+    updatedAt: serverTimestamp(),
+    updatedBy: input.updatedBy
+  });
+
+  return {
+    previousAmount: existing.amount,
+    amount: input.amount,
+    amountDifference,
+    fromShopId: existing.fromShopId,
+    toShopId: existing.toShopId
+  };
+});
+
 export const createCashAdjustment = async (input: CashAdjustmentInput) => {
   const delta = input.direction === 'add' ? input.amount : -input.amount;
   const batch = writeBatch(db);
@@ -192,12 +279,14 @@ const mapTransferHistory = (
 ): CashHistoryItem => {
   const data = snapshot.data();
   const otherShopId = direction === 'out' ? data.toShopId : data.fromShopId;
+  const note = String(data.note || '').trim();
+  const detail = [note, data.updatedAt ? 'Edited' : ''].filter(Boolean).join(' | ');
   return {
     id: snapshot.id,
     kind: direction === 'out' ? 'transfer-out' : 'transfer-in',
     amount: numberOrZero(data.amount),
     title: direction === 'out' ? `Transfer to ${getShopName(otherShopId)}` : `Received from ${getShopName(otherShopId)}`,
-    detail: String(data.note || '').trim() || undefined,
+    detail: detail || undefined,
     createdAt: historyDateOrNull(data.createdAt)
   };
 };
@@ -232,99 +321,138 @@ const mapCollectionHistory = (snapshot: QueryDocumentSnapshot<DocumentData>): Ca
   };
 };
 
-const readCashHistoryPage = async (
-  historyQuery: Query<DocumentData>,
-  mapRow: (snapshot: QueryDocumentSnapshot<DocumentData>) => CashHistoryItem
-): Promise<CashHistoryPage> => {
-  const snapshot = await getDocs(historyQuery);
-  return {
-    items: snapshot.docs.map(mapRow),
-    nextCursor: snapshot.docs.length
-      ? snapshot.docs[snapshot.docs.length - 1]
-      : null,
-    hasMore: snapshot.docs.length === CATEGORY_HISTORY_PAGE_SIZE
-  };
-};
+interface CashHistorySource {
+  collectionName: string;
+  filters: QueryConstraint[];
+  mapRow: (snapshot: QueryDocumentSnapshot<DocumentData>) => CashHistoryItem;
+  usesIsoDate: boolean;
+}
 
-export const getCashCategoryHistoryPage = (
+const getCategoryHistorySource = (
   shopId: ShopId,
-  category: CashHistoryCategory,
-  cursor?: CashHistoryCursor | null
-): Promise<CashHistoryPage> => {
-  const cursorConstraint = cursor ? [startAfter(cursor)] : [];
-
+  category: CashHistoryCategory
+): CashHistorySource => {
   if (category === 'collections') {
-    return readCashHistoryPage(query(
-      collection(db, PAYMENTS),
-      where('shopId', '==', shopId),
-      where('affectsShopCash', '==', true),
-      orderBy('createdAt', 'desc'),
-      ...cursorConstraint,
-      limit(CATEGORY_HISTORY_PAGE_SIZE)
-    ), mapCollectionHistory);
+    return {
+      collectionName: PAYMENTS,
+      filters: [where('shopId', '==', shopId), where('affectsShopCash', '==', true)],
+      mapRow: mapCollectionHistory,
+      usesIsoDate: true
+    };
   }
 
   if (category === 'expenses') {
-    return readCashHistoryPage(query(
-      collection(db, CASH_EXPENSES),
-      where('shopId', '==', shopId),
-      orderBy('createdAt', 'desc'),
-      ...cursorConstraint,
-      limit(CATEGORY_HISTORY_PAGE_SIZE)
-    ), mapExpenseHistory);
+    return {
+      collectionName: CASH_EXPENSES,
+      filters: [where('shopId', '==', shopId)],
+      mapRow: mapExpenseHistory,
+      usesIsoDate: false
+    };
   }
 
   const direction = category === 'transfers-in' ? 'in' : 'out';
-  const shopField = direction === 'in' ? 'toShopId' : 'fromShopId';
-  return readCashHistoryPage(query(
-    collection(db, SHOP_TRANSFERS),
-    where(shopField, '==', shopId),
-    orderBy('createdAt', 'desc'),
-    ...cursorConstraint,
-    limit(CATEGORY_HISTORY_PAGE_SIZE)
-  ), (row) => mapTransferHistory(row, direction));
+  return {
+    collectionName: SHOP_TRANSFERS,
+    filters: [where(direction === 'in' ? 'toShopId' : 'fromShopId', '==', shopId)],
+    mapRow: (row) => mapTransferHistory(row, direction),
+    usesIsoDate: false
+  };
 };
 
-export const getRecentCashHistory = async (shopId: ShopId): Promise<CashHistoryItem[]> => {
-  const expensesQuery = query(
-    collection(db, CASH_EXPENSES),
-    where('shopId', '==', shopId),
-    orderBy('createdAt', 'desc'),
-    limit(HISTORY_QUERY_LIMIT)
-  );
-  const outgoingQuery = query(
-    collection(db, SHOP_TRANSFERS),
-    where('fromShopId', '==', shopId),
-    orderBy('createdAt', 'desc'),
-    limit(HISTORY_QUERY_LIMIT)
-  );
-  const incomingQuery = query(
-    collection(db, SHOP_TRANSFERS),
-    where('toShopId', '==', shopId),
-    orderBy('createdAt', 'desc'),
-    limit(HISTORY_QUERY_LIMIT)
-  );
-  const adjustmentsQuery = query(
-    collection(db, CASH_ADJUSTMENTS),
-    where('shopId', '==', shopId),
-    orderBy('createdAt', 'desc'),
-    limit(HISTORY_QUERY_LIMIT)
-  );
+const getAdjustmentHistorySource = (shopId: ShopId): CashHistorySource => ({
+  collectionName: CASH_ADJUSTMENTS,
+  filters: [where('shopId', '==', shopId)],
+  mapRow: mapAdjustmentHistory,
+  usesIsoDate: false
+});
 
-  const [expenses, outgoing, incoming, adjustments] = await Promise.all([
-    getDocs(expensesQuery),
-    getDocs(outgoingQuery),
-    getDocs(incomingQuery),
-    getDocs(adjustmentsQuery)
-  ]);
+const getRangeBoundary = (source: CashHistorySource, date: Date) => (
+  source.usesIsoDate ? date.toISOString() : Timestamp.fromDate(date)
+);
 
-  return mergeRecentHistory([
-    expenses.docs.map(mapExpenseHistory),
-    outgoing.docs.map((row) => mapTransferHistory(row, 'out')),
-    incoming.docs.map((row) => mapTransferHistory(row, 'in')),
-    adjustments.docs.map(mapAdjustmentHistory)
-  ], HISTORY_DISPLAY_LIMIT);
+const readHistoryMonth = async (
+  source: CashHistorySource,
+  start: Date,
+  end: Date
+): Promise<CashHistoryItem[]> => {
+  const snapshot = await getDocs(query(
+    collection(db, source.collectionName),
+    ...source.filters,
+    where('createdAt', '>=', getRangeBoundary(source, start)),
+    where('createdAt', '<', getRangeBoundary(source, end)),
+    orderBy('createdAt', 'desc')
+  ));
+  return snapshot.docs.map(source.mapRow);
 };
+
+const readPreviousHistoryDates = async (
+  source: CashHistorySource,
+  before: Date
+): Promise<Date[]> => {
+  const dates: Date[] = [];
+  let cutoff = before;
+
+  while (dates.length < 240) {
+    const snapshot = await getDocs(query(
+      collection(db, source.collectionName),
+      ...source.filters,
+      where('createdAt', '<', getRangeBoundary(source, cutoff)),
+      orderBy('createdAt', 'desc'),
+      limit(1)
+    ));
+    if (snapshot.empty) break;
+
+    const date = historyDateAsDate(snapshot.docs[0].data().createdAt);
+    if (!date) break;
+    dates.push(date);
+    const nextCutoff = new Date(date.getFullYear(), date.getMonth(), 1);
+    if (nextCutoff.getTime() >= cutoff.getTime()) break;
+    cutoff = nextCutoff;
+  }
+
+  return dates;
+};
+
+export const getCashCategoryHistoryMonth = (
+  shopId: ShopId,
+  category: CashHistoryCategory,
+  start: Date,
+  end: Date
+) => readHistoryMonth(getCategoryHistorySource(shopId, category), start, end);
+
+export const getCashCategoryPreviousHistoryDates = (
+  shopId: ShopId,
+  category: CashHistoryCategory,
+  before: Date
+) => readPreviousHistoryDates(getCategoryHistorySource(shopId, category), before);
+
+const getAllHistorySources = (shopId: ShopId) => [
+  getCategoryHistorySource(shopId, 'collections'),
+  getCategoryHistorySource(shopId, 'expenses'),
+  getCategoryHistorySource(shopId, 'transfers-in'),
+  getCategoryHistorySource(shopId, 'transfers-out'),
+  getAdjustmentHistorySource(shopId)
+];
+
+export const getCashHistoryMonth = async (
+  shopId: ShopId,
+  start: Date,
+  end: Date
+): Promise<CashHistoryItem[]> => {
+  const groups = await Promise.all(
+    getAllHistorySources(shopId).map((source) => readHistoryMonth(source, start, end))
+  );
+  return sortCashHistory(groups);
+};
+
+export const getCashPreviousHistoryDates = async (
+  shopId: ShopId,
+  before: Date
+): Promise<Date[]> => (
+  (await Promise.all(
+    getAllHistorySources(shopId).map((source) => readPreviousHistoryDates(source, before))
+  )).flat()
+);
 
 export const getFriendlyCashError = (
   error: unknown,

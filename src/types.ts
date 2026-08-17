@@ -69,6 +69,19 @@ export interface ShopTransferInput {
   createdBy: string;
 }
 
+export interface ShopTransferRecord extends ShopTransferInput {
+  createdAt?: Timestamp | string | null;
+  updatedAt?: Timestamp | string | null;
+  updatedBy?: string;
+}
+
+export interface ShopTransferUpdateInput {
+  id: string;
+  amount: number;
+  note: string;
+  updatedBy: string;
+}
+
 export interface CashAdjustmentInput {
   id: string;
   shopId: ShopId;

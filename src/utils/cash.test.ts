@@ -16,6 +16,7 @@ import {
   isShopCashInitialized,
   mergeRecentHistory,
   parseMoneyInput,
+  sortCashHistory,
   validateDescription
 } from './cash';
 import { getOtherShopId, getShopName, isShopId } from './shops';
@@ -121,6 +122,16 @@ describe('local summary updates', () => {
     expect(incoming.totalCollections).toBe(20_000);
   });
 
+  it('applies only the amount difference when an outgoing transfer is edited', () => {
+    const increased = applyTransferToSummary(summary, 50, 'out');
+    const reduced = applyTransferToSummary(summary, -50, 'out');
+
+    expect(increased.availableBalance).toBe(9_950);
+    expect(increased.totalTransferredOut).toBe(1_050);
+    expect(reduced.availableBalance).toBe(10_050);
+    expect(reduced.totalTransferredOut).toBe(950);
+  });
+
   it('applies Admin adjustments without changing collection or activity totals', () => {
     const added = applyAdjustmentToSummary(summary, 1_250, 'add');
     const deducted = applyAdjustmentToSummary(summary, 750, 'deduct');
@@ -202,6 +213,12 @@ describe('bounded history and shops', () => {
 
     expect(mergeRecentHistory([[timestampRow], [stringRow]]).map((row) => row.id))
       .toEqual(['string', 'timestamp']);
+  });
+
+  it('sorts a complete month without applying the recent-history limit', () => {
+    const groups = Array.from({ length: 25 }, (_, index) => [historyItem(String(index), index)]);
+    expect(sortCashHistory(groups)).toHaveLength(25);
+    expect(sortCashHistory(groups)[0].id).toBe('24');
   });
 
   it('uses the fixed two-shop relationship', () => {
