@@ -2,6 +2,7 @@ import { History, Home, LogOut, ShieldCheck, WalletCards, WifiOff } from 'lucide
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { NavLink, Outlet } from 'react-router-dom';
 import { CashMovementPopup } from './CashMovementPopup';
+import { InstallAppPrompt } from './InstallAppPrompt';
 import { useAuth } from '../context/AuthContext';
 import { useCash } from '../context/CashContext';
 import { useOnlineStatus } from '../hooks/useOnlineStatus';
@@ -151,6 +152,8 @@ export const AppShell = () => {
           </NavLink>
         ) : null}
       </nav>
+
+      <InstallAppPrompt disabled={!online || Boolean(cashMovement)} />
 
       {cashMovement ? <CashMovementPopup movement={cashMovement} onClose={closeCashMovement} /> : null}
     </div>

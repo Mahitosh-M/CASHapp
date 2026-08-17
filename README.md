@@ -2,6 +2,8 @@
 
 Lightweight mobile-first cash management for authorized ASHOKA and SMPA staff.
 
+The production site is an installable progressive web app. Staff can open `https://cashapp-a213f.web.app/` on a phone and add Cash App to the home screen from the in-app installation prompt.
+
 ## Project responsibilities
 
 - `cashapp-a213f`: Firebase Hosting target for this separate application.
