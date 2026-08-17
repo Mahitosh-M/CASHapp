@@ -12,7 +12,7 @@ Keeping runtime data in the CRM project is required because Firebase Auth tokens
 
 ## Current status
 
-The application and matching CRM rules/index changes are implemented and rule-emulator tested locally. They still require a controlled end-to-end user test and an explicit production deployment before live financial writes are enabled. See [docs/CRM_FIRESTORE_INTEGRATION.md](docs/CRM_FIRESTORE_INTEGRATION.md).
+The application and matching CRM rules/index changes are implemented, tested, and deployed. A controlled end-to-end user test is still recommended before relying on live financial writes. See [docs/CRM_FIRESTORE_INTEGRATION.md](docs/CRM_FIRESTORE_INTEGRATION.md).
 
 This repository deliberately configures Firebase Hosting only. It does not contain a deployable Firestore rules file, preventing a Cash App deployment from replacing the CRM's existing ruleset.
 
@@ -49,7 +49,9 @@ Admin and Staff use separate login commands on the same form, but both authentic
 
 ## Hosting
 
-After the CISapp rules/indexes are approved, tested, and deployed:
+Every push to `main` runs the test suite and production build, then deploys Cash App to Firebase Hosting only if both succeed. The GitHub repository must contain the encrypted Actions secret `FIREBASE_SERVICE_ACCOUNT_CASHAPP_A213F`. Never commit the service-account JSON.
+
+For an emergency manual Hosting-only deployment:
 
 ```powershell
 npm run build

@@ -1,4 +1,4 @@
-name: Cash App CI
+name: Cash App CI/CD
 
 on:
   push:
@@ -7,6 +7,10 @@ on:
 
 permissions:
   contents: read
+
+concurrency:
+  group: cashapp-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   verify:
@@ -25,3 +29,11 @@ jobs:
         run: npm test
       - name: Build
         run: npm run build
+      - name: Deploy to Firebase Hosting
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: FirebaseExtended/action-hosting-deploy@v0
+        with:
+          repoToken: ${{ secrets.GITHUB_TOKEN }}
+          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_CASHAPP_A213F }}
+          channelId: live
+          projectId: cashapp-a213f
