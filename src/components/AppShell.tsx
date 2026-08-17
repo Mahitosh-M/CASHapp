@@ -53,8 +53,8 @@ export const AppShell = () => {
   const online = useOnlineStatus();
   const [cashMovement, setCashMovement] = useState<CashMovement | null>(null);
   const memorySnapshots = useRef<Record<string, CashBalanceSnapshot>>({});
-  const currentSnapshot = useRef<{ key: string; value: CashBalanceSnapshot } | null>(null);
-  const snapshotKey = firebaseUser && currentShopId
+  const isStaff = profile?.role === 'Staff';
+  const snapshotKey = isStaff && firebaseUser && currentShopId
     ? `${CASH_SNAPSHOT_PREFIX}:${firebaseUser.uid}:${currentShopId}`
     : '';
 
@@ -63,10 +63,9 @@ export const AppShell = () => {
   }, [snapshotKey]);
 
   useEffect(() => {
-    if (!snapshotKey || summaryLoading || !summary) return;
+    if (!isStaff || !snapshotKey || summaryLoading || !summary) return;
 
     const nextSnapshot = createCashBalanceSnapshot(summary);
-    currentSnapshot.current = { key: snapshotKey, value: nextSnapshot };
     const previousSnapshot = readStoredSnapshot(snapshotKey) || memorySnapshots.current[snapshotKey];
 
     if (!previousSnapshot) {
@@ -82,15 +81,12 @@ export const AppShell = () => {
       return;
     }
 
+    memorySnapshots.current[snapshotKey] = nextSnapshot;
+    writeStoredSnapshot(snapshotKey, nextSnapshot);
     setCashMovement(movement);
-  }, [snapshotKey, summary, summaryLoading]);
+  }, [isStaff, snapshotKey, summary, summaryLoading]);
 
   const closeCashMovement = useCallback(() => {
-    const latestSnapshot = currentSnapshot.current;
-    if (latestSnapshot) {
-      memorySnapshots.current[latestSnapshot.key] = latestSnapshot.value;
-      writeStoredSnapshot(latestSnapshot.key, latestSnapshot.value);
-    }
     setCashMovement(null);
   }, []);
 
@@ -153,9 +149,9 @@ export const AppShell = () => {
         ) : null}
       </nav>
 
-      <InstallAppPrompt disabled={!online || Boolean(cashMovement)} />
+      <InstallAppPrompt disabled={!online || Boolean(isStaff && cashMovement)} />
 
-      {cashMovement ? <CashMovementPopup movement={cashMovement} onClose={closeCashMovement} /> : null}
+      {isStaff && cashMovement ? <CashMovementPopup movement={cashMovement} onClose={closeCashMovement} /> : null}
     </div>
   );
 };

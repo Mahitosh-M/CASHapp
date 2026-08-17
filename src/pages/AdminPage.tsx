@@ -2,6 +2,7 @@ import { CircleMinus, CirclePlus, IndianRupee, SlidersHorizontal } from 'lucide-
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
 import { PageHeader } from '../components/PageHeader';
+import { WholeRupeeInput } from '../components/WholeRupeeInput';
 import { useAuth } from '../context/AuthContext';
 import { useCash } from '../context/CashContext';
 import { useOnlineStatus } from '../hooks/useOnlineStatus';
@@ -13,7 +14,6 @@ import {
 import type { CashAdjustmentDirection } from '../types';
 import {
   MAX_DESCRIPTION_LENGTH,
-  MAX_MONEY_AMOUNT,
   formatMoney,
   isShopCashInitialized,
   isValidMoneyAmount,
@@ -58,7 +58,7 @@ export const AdminPage = () => {
       return 'Available amount is not ready. Initialize this branch from Home first.';
     }
     if (!isValidMoneyAmount(amount)) {
-      return 'Enter a valid amount greater than zero, with no more than two decimal places.';
+      return 'Enter a whole rupee amount greater than zero.';
     }
     if (direction === 'deduct' && amount > summary.availableBalance) {
       return 'Deduction cannot exceed the available amount.';
@@ -161,18 +161,12 @@ export const AdminPage = () => {
           Amount
           <span className="money-input">
             <IndianRupee size={21} />
-            <input
-              type="number"
-              min="0.01"
-              max={MAX_MONEY_AMOUNT}
-              step="0.01"
-              inputMode="decimal"
+            <WholeRupeeInput
               value={amountText}
-              onChange={(event) => {
-                setAmountText(event.target.value);
+              onValueChange={(value) => {
+                setAmountText(value);
                 resetOperationId();
               }}
-              placeholder="0"
               disabled={submitting}
               autoFocus
             />

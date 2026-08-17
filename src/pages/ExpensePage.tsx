@@ -2,13 +2,13 @@ import { IndianRupee, Save } from 'lucide-react';
 import { useRef, useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { PageHeader } from '../components/PageHeader';
+import { WholeRupeeInput } from '../components/WholeRupeeInput';
 import { useAuth } from '../context/AuthContext';
 import { useCash } from '../context/CashContext';
 import { useOnlineStatus } from '../hooks/useOnlineStatus';
 import { createExpense, createExpenseId, getFriendlyCashError } from '../services/cashService';
 import {
   MAX_DESCRIPTION_LENGTH,
-  MAX_MONEY_AMOUNT,
   formatMoney,
   isShopCashInitialized,
   isValidMoneyAmount,
@@ -45,7 +45,7 @@ export const ExpensePage = () => {
 
     const amount = parseMoneyInput(amountText);
     if (!isValidMoneyAmount(amount)) {
-      setError('Enter a valid amount greater than zero, with no more than two decimal places.');
+      setError('Enter a whole rupee amount greater than zero.');
       return;
     }
     if (amount > summary.availableBalance) {
@@ -89,18 +89,12 @@ export const ExpensePage = () => {
           Amount
           <span className="money-input">
             <IndianRupee size={21} />
-            <input
-              type="number"
-              min="0.01"
-              max={MAX_MONEY_AMOUNT}
-              step="0.01"
-              inputMode="decimal"
+            <WholeRupeeInput
               value={amountText}
-              onChange={(event) => {
-                setAmountText(event.target.value);
+              onValueChange={(value) => {
+                setAmountText(value);
                 resetOperationId();
               }}
-              placeholder="0"
               disabled={submitting}
               autoFocus
             />

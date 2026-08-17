@@ -16,14 +16,16 @@ export const parseMoneyInput = (value: string) => {
   return Number(trimmed);
 };
 
+export const isWholeRupeeInput = (value: string) => /^\d*$/.test(value);
+
 export const isValidMoneyAmount = (amount: number) => {
   if (!Number.isFinite(amount) || amount <= 0 || amount > MAX_MONEY_AMOUNT) return false;
-  return Math.abs(amount * 100 - Math.round(amount * 100)) < 0.000001;
+  return Number.isInteger(amount);
 };
 
 export const isValidOpeningBalance = (amount: number) => {
   if (!Number.isFinite(amount) || amount < 0 || amount > MAX_MONEY_AMOUNT) return false;
-  return Math.abs(amount * 100 - Math.round(amount * 100)) < 0.000001;
+  return Number.isInteger(amount);
 };
 
 export const validateDescription = (value: string) => {
@@ -36,26 +38,26 @@ export const validateDescription = (value: string) => {
 export const formatMoney = (amount: number) => new Intl.NumberFormat('en-IN', {
   style: 'currency',
   currency: 'INR',
-  minimumFractionDigits: Number.isInteger(amount) ? 0 : 2,
-  maximumFractionDigits: 2
-}).format(amount);
+  minimumFractionDigits: 0,
+  maximumFractionDigits: 0
+}).format(Math.round(amount));
 
-const toMoney = (amount: number) => Math.round(amount * 100) / 100;
+const toWholeRupees = (amount: number) => Math.round(amount);
 
 export const createCashBalanceSnapshot = (summary: ShopCashSummary): CashBalanceSnapshot => ({
-  availableBalance: toMoney(summary.availableBalance),
-  totalCollections: toMoney(summary.totalCollections),
-  totalExpenses: toMoney(summary.totalExpenses),
-  totalTransferredIn: toMoney(summary.totalTransferredIn),
-  totalTransferredOut: toMoney(summary.totalTransferredOut),
-  openingBalance: toMoney(summary.openingBalance)
+  availableBalance: toWholeRupees(summary.availableBalance),
+  totalCollections: toWholeRupees(summary.totalCollections),
+  totalExpenses: toWholeRupees(summary.totalExpenses),
+  totalTransferredIn: toWholeRupees(summary.totalTransferredIn),
+  totalTransferredOut: toWholeRupees(summary.totalTransferredOut),
+  openingBalance: toWholeRupees(summary.openingBalance)
 });
 
 export const detectCashMovement = (
   previous: CashBalanceSnapshot,
   current: CashBalanceSnapshot
 ): CashMovement | null => {
-  const balanceChange = toMoney(current.availableBalance - previous.availableBalance);
+  const balanceChange = current.availableBalance - previous.availableBalance;
   if (balanceChange === 0) return null;
 
   const direction = balanceChange > 0 ? 'in' : 'out';

@@ -2,13 +2,13 @@ import { ArrowRight, ArrowRightLeft, IndianRupee } from 'lucide-react';
 import { useRef, useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { PageHeader } from '../components/PageHeader';
+import { WholeRupeeInput } from '../components/WholeRupeeInput';
 import { useAuth } from '../context/AuthContext';
 import { useCash } from '../context/CashContext';
 import { useOnlineStatus } from '../hooks/useOnlineStatus';
 import { createTransfer, createTransferId, getFriendlyCashError } from '../services/cashService';
 import {
   MAX_DESCRIPTION_LENGTH,
-  MAX_MONEY_AMOUNT,
   formatMoney,
   isShopCashInitialized,
   isValidMoneyAmount,
@@ -40,7 +40,7 @@ export const TransferPage = () => {
     if (!summary || !isShopCashInitialized(summary) || !currentShopId || !destinationShopId || !firebaseUser) {
       return 'Available amount is not ready. Return home and refresh.';
     }
-    if (!isValidMoneyAmount(amount)) return 'Enter a valid amount greater than zero, with no more than two decimal places.';
+    if (!isValidMoneyAmount(amount)) return 'Enter a whole rupee amount greater than zero.';
     if (amount > summary.availableBalance) return 'Insufficient available amount.';
     if (note.trim().length > MAX_DESCRIPTION_LENGTH) return `Keep the note within ${MAX_DESCRIPTION_LENGTH} characters.`;
     return '';
@@ -109,18 +109,12 @@ export const TransferPage = () => {
           Amount
           <span className="money-input">
             <IndianRupee size={21} />
-            <input
-              type="number"
-              min="0.01"
-              max={MAX_MONEY_AMOUNT}
-              step="0.01"
-              inputMode="decimal"
+            <WholeRupeeInput
               value={amountText}
-              onChange={(event) => {
-                setAmountText(event.target.value);
+              onValueChange={(value) => {
+                setAmountText(value);
                 resetOperationId();
               }}
-              placeholder="0"
               disabled={submitting}
               autoFocus
             />

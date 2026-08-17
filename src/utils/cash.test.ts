@@ -9,6 +9,8 @@ import {
   applyTransferToSummary,
   createCashBalanceSnapshot,
   detectCashMovement,
+  formatMoney,
+  isWholeRupeeInput,
   isValidMoneyAmount,
   isValidOpeningBalance,
   isShopCashInitialized,
@@ -38,13 +40,13 @@ const historyItem = (id: string, milliseconds: number): CashHistoryItem => ({
 
 describe('cash input validation', () => {
   it('parses normal rupee values and rejects blank input', () => {
-    expect(parseMoneyInput(' 1250.50 ')).toBe(1250.5);
+    expect(parseMoneyInput(' 1250 ')).toBe(1250);
     expect(Number.isNaN(parseMoneyInput(''))).toBe(true);
   });
 
-  it('accepts positive values with at most two decimal places', () => {
+  it('accepts positive whole rupees and rejects fractional values', () => {
     expect(isValidMoneyAmount(1)).toBe(true);
-    expect(isValidMoneyAmount(10.25)).toBe(true);
+    expect(isValidMoneyAmount(10.25)).toBe(false);
     expect(isValidMoneyAmount(10.256)).toBe(false);
   });
 
@@ -57,9 +59,22 @@ describe('cash input validation', () => {
 
   it('allows zero only for the one-time opening balance', () => {
     expect(isValidOpeningBalance(0)).toBe(true);
-    expect(isValidOpeningBalance(500.25)).toBe(true);
+    expect(isValidOpeningBalance(500.25)).toBe(false);
     expect(isValidOpeningBalance(-1)).toBe(false);
     expect(isValidOpeningBalance(1.001)).toBe(false);
+  });
+
+  it('allows only digits in whole-rupee input fields', () => {
+    expect(isWholeRupeeInput('')).toBe(true);
+    expect(isWholeRupeeInput('1250')).toBe(true);
+    expect(isWholeRupeeInput('12.50')).toBe(false);
+    expect(isWholeRupeeInput('-10')).toBe(false);
+  });
+
+  it('formats balances and movement snapshots as whole rupees', () => {
+    expect(formatMoney(1_250.75)).toContain('1,251');
+    expect(formatMoney(1_250.75)).not.toContain('.');
+    expect(createCashBalanceSnapshot({ ...summary, availableBalance: 10_000.6 }).availableBalance).toBe(10_001);
   });
 
   it('requires a trimmed expense explanation', () => {

@@ -55,7 +55,7 @@ export const LoginPage = () => {
         </div>
         {(formError || authError) ? <div className="notice error" role="alert">{formError || authError}</div> : null}
 
-        <form className="form-stack" onSubmit={handleSubmit}>
+        <form className="form-stack" onSubmit={handleSubmit} autoComplete="off">
           <label>
             Email
             <span className="input-with-icon">
@@ -66,13 +66,15 @@ export const LoginPage = () => {
                 value={email}
                 onChange={(event) => setEmail(event.target.value)}
                 onKeyDown={handleEmailKeyDown}
-                autoComplete="email"
+                autoComplete="off"
                 autoCapitalize="none"
                 enterKeyHint="next"
                 inputMode="email"
-                placeholder="staff@company.com"
+                placeholder="Enter email"
                 spellCheck={false}
                 disabled={submitting}
+                data-1p-ignore="true"
+                data-lpignore="true"
               />
             </span>
           </label>
@@ -86,10 +88,12 @@ export const LoginPage = () => {
                 type={passwordVisible ? 'text' : 'password'}
                 value={password}
                 onChange={(event) => setPassword(event.target.value)}
-                autoComplete="current-password"
+                autoComplete="off"
                 enterKeyHint="go"
                 placeholder="Password"
                 disabled={submitting}
+                data-1p-ignore="true"
+                data-lpignore="true"
               />
               <button
                 className="password-toggle"

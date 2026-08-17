@@ -23,9 +23,13 @@ export const CashMovementPopup = ({ movement, onClose }: { movement: CashMovemen
     const closeOnEscape = (event: KeyboardEvent) => {
       if (event.key === 'Escape') onClose();
     };
+    const autoCloseTimeout = window.setTimeout(onClose, 4_000);
 
     window.addEventListener('keydown', closeOnEscape);
-    return () => window.removeEventListener('keydown', closeOnEscape);
+    return () => {
+      window.clearTimeout(autoCloseTimeout);
+      window.removeEventListener('keydown', closeOnEscape);
+    };
   }, [onClose]);
 
   return (

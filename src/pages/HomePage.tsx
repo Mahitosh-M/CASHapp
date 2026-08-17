@@ -9,12 +9,12 @@ import {
 } from 'lucide-react';
 import { useEffect, useState, type FormEvent } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
+import { WholeRupeeInput } from '../components/WholeRupeeInput';
 import { useAuth } from '../context/AuthContext';
 import { useCash } from '../context/CashContext';
 import { useOnlineStatus } from '../hooks/useOnlineStatus';
 import { getFriendlyCashError, initializeShopCash } from '../services/cashService';
 import {
-  MAX_MONEY_AMOUNT,
   formatMoney,
   isShopCashInitialized,
   isValidOpeningBalance,
@@ -87,7 +87,7 @@ export const HomePage = () => {
 
     const openingBalance = parseMoneyInput(openingBalanceText);
     if (!isValidOpeningBalance(openingBalance)) {
-      setInitializationError('Enter zero or a valid opening amount with no more than two decimal places.');
+      setInitializationError('Enter zero or a valid whole rupee opening amount.');
       return;
     }
 
@@ -150,14 +150,9 @@ export const HomePage = () => {
               Opening cash to add
               <span className="money-input">
                 <IndianRupee size={21} />
-                <input
-                  type="number"
-                  min="0"
-                  max={MAX_MONEY_AMOUNT}
-                  step="0.01"
-                  inputMode="decimal"
+                <WholeRupeeInput
                   value={openingBalanceText}
-                  onChange={(event) => setOpeningBalanceText(event.target.value)}
+                  onValueChange={setOpeningBalanceText}
                   disabled={initializing}
                 />
               </span>
