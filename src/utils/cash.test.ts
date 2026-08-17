@@ -104,6 +104,12 @@ describe('local summary updates', () => {
     expect(next.totalCollections).toBe(20_000);
   });
 
+  it('allows an expense to create a negative available balance', () => {
+    const next = applyExpenseToSummary(summary, 12_500);
+    expect(next.availableBalance).toBe(-2_500);
+    expect(next.totalExpenses).toBe(14_500);
+  });
+
   it('applies outgoing and incoming transfers without changing collections', () => {
     const outgoing = applyTransferToSummary(summary, 2_000, 'out');
     const incoming = applyTransferToSummary(summary, 2_000, 'in');
@@ -185,6 +191,17 @@ describe('bounded history and shops', () => {
       [historyItem('middle', 2_000)]
     ], 2);
     expect(rows.map((row) => row.id)).toEqual(['new', 'middle']);
+  });
+
+  it('sorts CIS collection dates stored as ISO strings with CashApp timestamps', () => {
+    const timestampRow = historyItem('timestamp', 2_000);
+    const stringRow: CashHistoryItem = {
+      ...historyItem('string', 1_000),
+      createdAt: new Date(3_000).toISOString()
+    };
+
+    expect(mergeRecentHistory([[timestampRow], [stringRow]]).map((row) => row.id))
+      .toEqual(['string', 'timestamp']);
   });
 
   it('uses the fixed two-shop relationship', () => {

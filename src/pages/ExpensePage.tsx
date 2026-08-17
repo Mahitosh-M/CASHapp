@@ -48,10 +48,6 @@ export const ExpensePage = () => {
       setError('Enter a whole rupee amount greater than zero.');
       return;
     }
-    if (amount > summary.availableBalance) {
-      setError('Expense cannot exceed the available amount.');
-      return;
-    }
     const descriptionError = validateDescription(description);
     if (descriptionError) {
       setError(descriptionError);

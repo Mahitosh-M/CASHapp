@@ -1,30 +1,8 @@
-import { ArrowDownLeft, ArrowUpRight, CircleMinus, CirclePlus, History, ReceiptText, RefreshCw } from 'lucide-react';
+import { History, RefreshCw } from 'lucide-react';
 import { useEffect } from 'react';
+import { CashHistoryList } from '../components/CashHistoryList';
 import { PageHeader } from '../components/PageHeader';
 import { useCash } from '../context/CashContext';
-import type { CashHistoryItem } from '../types';
-import { formatMoney } from '../utils/cash';
-
-const formatActivityTime = (item: CashHistoryItem) => {
-  const date = item.createdAt?.toDate();
-  if (!date) return 'Just now';
-  const today = new Date();
-  const sameDay = date.getFullYear() === today.getFullYear()
-    && date.getMonth() === today.getMonth()
-    && date.getDate() === today.getDate();
-
-  return sameDay
-    ? `Today, ${new Intl.DateTimeFormat('en-IN', { timeStyle: 'short' }).format(date)}`
-    : new Intl.DateTimeFormat('en-IN', { dateStyle: 'medium', timeStyle: 'short' }).format(date);
-};
-
-const ActivityIcon = ({ kind }: { kind: CashHistoryItem['kind'] }) => {
-  if (kind === 'transfer-in') return <ArrowDownLeft size={21} />;
-  if (kind === 'transfer-out') return <ArrowUpRight size={21} />;
-  if (kind === 'adjustment-in') return <CirclePlus size={21} />;
-  if (kind === 'adjustment-out') return <CircleMinus size={21} />;
-  return <ReceiptText size={21} />;
-};
 
 export const HistoryPage = () => {
   const { history, historyError, historyLoading, loadHistory } = useCash();
@@ -65,24 +43,7 @@ export const HistoryPage = () => {
         </div>
       ) : null}
 
-      {history.length > 0 ? (
-        <div className="history-list">
-          {history.map((item) => {
-            const positive = item.kind === 'transfer-in' || item.kind === 'adjustment-in';
-            return (
-              <article className={`history-row ${positive ? 'positive' : 'negative'}`} key={`${item.kind}-${item.id}`}>
-                <div className="history-icon"><ActivityIcon kind={item.kind} /></div>
-                <div className="history-copy">
-                  <strong>{item.title}</strong>
-                  {item.detail ? <span>{item.detail}</span> : null}
-                  <time>{formatActivityTime(item)}</time>
-                </div>
-                <div className="history-amount">{positive ? '+' : '-'} {formatMoney(item.amount)}</div>
-              </article>
-            );
-          })}
-        </div>
-      ) : null}
+      {history.length > 0 ? <CashHistoryList items={history} /> : null}
     </div>
   );
 };

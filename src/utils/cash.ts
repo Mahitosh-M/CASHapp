@@ -140,7 +140,14 @@ export const applyInitializationToSummary = (
   };
 };
 
-const historyTime = (item: CashHistoryItem) => item.createdAt?.toMillis() ?? 0;
+const historyTime = (item: CashHistoryItem) => {
+  if (!item.createdAt) return 0;
+  if (typeof item.createdAt === 'string') {
+    const milliseconds = Date.parse(item.createdAt);
+    return Number.isNaN(milliseconds) ? 0 : milliseconds;
+  }
+  return item.createdAt.toMillis();
+};
 
 export const mergeRecentHistory = (groups: CashHistoryItem[][], maximum = 20) => groups
   .flat()

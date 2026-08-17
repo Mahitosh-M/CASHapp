@@ -118,7 +118,11 @@ export const HomePage = () => {
 
       <section className="balance-panel" aria-label="Available amount">
         <div className="balance-label">AVAILABLE AMOUNT</div>
-        {summaryLoading ? <div className="balance-skeleton" /> : <div className="balance-value">{formatMoney(summary?.availableBalance ?? 0)}</div>}
+        {summaryLoading ? <div className="balance-skeleton" /> : (
+          <div className={`balance-value ${(summary?.availableBalance ?? 0) < 0 ? 'negative' : ''}`}>
+            {formatMoney(summary?.availableBalance ?? 0)}
+          </div>
+        )}
         <div className="balance-updated">
           {summary?.updatedAt ? `Updated ${formatUpdatedAt(summary.updatedAt)}` : 'Awaiting branch setup'}
         </div>
@@ -165,26 +169,26 @@ export const HomePage = () => {
       ) : null}
 
       <section className="summary-grid" aria-label="Cash totals">
-        <div className="summary-item">
+        <button className="summary-item" type="button" onClick={() => navigate('/history/collections')}>
           <ReceiptText size={20} />
           <span>Collections</span>
           <strong>{formatMoney(summary?.totalCollections ?? 0)}</strong>
-        </div>
-        <div className="summary-item expense-tone">
+        </button>
+        <button className="summary-item expense-tone" type="button" onClick={() => navigate('/history/expenses')}>
           <TrendingDown size={20} />
           <span>Expenses</span>
           <strong>{formatMoney(summary?.totalExpenses ?? 0)}</strong>
-        </div>
-        <div className="summary-item incoming-tone">
+        </button>
+        <button className="summary-item incoming-tone" type="button" onClick={() => navigate('/history/transfers-in')}>
           <TrendingUp size={20} />
           <span>Transferred in</span>
           <strong>{formatMoney(summary?.totalTransferredIn ?? 0)}</strong>
-        </div>
-        <div className="summary-item outgoing-tone">
+        </button>
+        <button className="summary-item outgoing-tone" type="button" onClick={() => navigate('/history/transfers-out')}>
           <ArrowRightLeft size={20} />
           <span>Transferred out</span>
           <strong>{formatMoney(summary?.totalTransferredOut ?? 0)}</strong>
-        </div>
+        </button>
       </section>
     </div>
   );

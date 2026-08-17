@@ -9,9 +9,11 @@ import {
   orderBy,
   query,
   serverTimestamp,
+  startAfter,
   where,
   writeBatch,
   type DocumentData,
+  type Query,
   type QueryDocumentSnapshot
 } from 'firebase/firestore';
 import { db } from '../firebase';
@@ -19,6 +21,7 @@ import type {
   CashAdjustmentInput,
   CashInitializationInput,
   CashExpenseInput,
+  CashHistoryCategory,
   CashHistoryItem,
   ShopCashSummary,
   ShopId,
@@ -32,15 +35,28 @@ const CASH_EXPENSES = 'cashExpenses';
 const SHOP_TRANSFERS = 'shopTransfers';
 const CASH_ADJUSTMENTS = 'cashAdjustments';
 const CASH_INITIALIZATIONS = 'cashInitializations';
+const PAYMENTS = 'payments';
 const HISTORY_QUERY_LIMIT = 10;
 const HISTORY_DISPLAY_LIMIT = 20;
+export const CATEGORY_HISTORY_PAGE_SIZE = 50;
+
+export type CashHistoryCursor = QueryDocumentSnapshot<DocumentData>;
+
+export interface CashHistoryPage {
+  items: CashHistoryItem[];
+  nextCursor: CashHistoryCursor | null;
+  hasMore: boolean;
+}
 
 const numberOrZero = (value: unknown) => {
   const number = Number(value);
   return Number.isFinite(number) ? number : 0;
 };
 
-const timestampOrNull = (value: unknown) => value instanceof Timestamp ? value : null;
+const historyDateOrNull = (value: unknown) => {
+  if (value instanceof Timestamp) return value;
+  return typeof value === 'string' && value ? value : null;
+};
 
 export const createExpenseId = () => doc(collection(db, CASH_EXPENSES)).id;
 export const createTransferId = () => doc(collection(db, SHOP_TRANSFERS)).id;
@@ -166,7 +182,7 @@ const mapExpenseHistory = (snapshot: QueryDocumentSnapshot<DocumentData>): CashH
     kind: 'expense',
     amount: numberOrZero(data.amount),
     title: String(data.description || 'Expense'),
-    createdAt: timestampOrNull(data.createdAt)
+    createdAt: historyDateOrNull(data.createdAt)
   };
 };
 
@@ -182,7 +198,7 @@ const mapTransferHistory = (
     amount: numberOrZero(data.amount),
     title: direction === 'out' ? `Transfer to ${getShopName(otherShopId)}` : `Received from ${getShopName(otherShopId)}`,
     detail: String(data.note || '').trim() || undefined,
-    createdAt: timestampOrNull(data.createdAt)
+    createdAt: historyDateOrNull(data.createdAt)
   };
 };
 
@@ -195,8 +211,78 @@ const mapAdjustmentHistory = (snapshot: QueryDocumentSnapshot<DocumentData>): Ca
     amount: numberOrZero(data.amount),
     title: incoming ? 'Admin amount added' : 'Admin amount deducted',
     detail: String(data.reason || '').trim() || undefined,
-    createdAt: timestampOrNull(data.createdAt)
+    createdAt: historyDateOrNull(data.createdAt)
   };
+};
+
+const mapCollectionHistory = (snapshot: QueryDocumentSnapshot<DocumentData>): CashHistoryItem => {
+  const data = snapshot.data();
+  const customerName = String(data.customerName || '').trim();
+  const invoiceNumber = String(data.invoiceNumber || '').trim();
+  const paymentMode = String(data.mode || '').trim();
+  const detail = [invoiceNumber ? `Invoice ${invoiceNumber}` : '', paymentMode].filter(Boolean).join(' | ');
+
+  return {
+    id: snapshot.id,
+    kind: 'collection',
+    amount: numberOrZero(data.cashSyncedAmount),
+    title: customerName ? `Payment from ${customerName}` : 'Customer payment',
+    detail: detail || undefined,
+    createdAt: historyDateOrNull(data.createdAt)
+  };
+};
+
+const readCashHistoryPage = async (
+  historyQuery: Query<DocumentData>,
+  mapRow: (snapshot: QueryDocumentSnapshot<DocumentData>) => CashHistoryItem
+): Promise<CashHistoryPage> => {
+  const snapshot = await getDocs(historyQuery);
+  return {
+    items: snapshot.docs.map(mapRow),
+    nextCursor: snapshot.docs.length
+      ? snapshot.docs[snapshot.docs.length - 1]
+      : null,
+    hasMore: snapshot.docs.length === CATEGORY_HISTORY_PAGE_SIZE
+  };
+};
+
+export const getCashCategoryHistoryPage = (
+  shopId: ShopId,
+  category: CashHistoryCategory,
+  cursor?: CashHistoryCursor | null
+): Promise<CashHistoryPage> => {
+  const cursorConstraint = cursor ? [startAfter(cursor)] : [];
+
+  if (category === 'collections') {
+    return readCashHistoryPage(query(
+      collection(db, PAYMENTS),
+      where('shopId', '==', shopId),
+      where('affectsShopCash', '==', true),
+      orderBy('createdAt', 'desc'),
+      ...cursorConstraint,
+      limit(CATEGORY_HISTORY_PAGE_SIZE)
+    ), mapCollectionHistory);
+  }
+
+  if (category === 'expenses') {
+    return readCashHistoryPage(query(
+      collection(db, CASH_EXPENSES),
+      where('shopId', '==', shopId),
+      orderBy('createdAt', 'desc'),
+      ...cursorConstraint,
+      limit(CATEGORY_HISTORY_PAGE_SIZE)
+    ), mapExpenseHistory);
+  }
+
+  const direction = category === 'transfers-in' ? 'in' : 'out';
+  const shopField = direction === 'in' ? 'toShopId' : 'fromShopId';
+  return readCashHistoryPage(query(
+    collection(db, SHOP_TRANSFERS),
+    where(shopField, '==', shopId),
+    orderBy('createdAt', 'desc'),
+    ...cursorConstraint,
+    limit(CATEGORY_HISTORY_PAGE_SIZE)
+  ), (row) => mapTransferHistory(row, direction));
 };
 
 export const getRecentCashHistory = async (shopId: ShopId): Promise<CashHistoryItem[]> => {

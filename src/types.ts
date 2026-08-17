@@ -3,6 +3,7 @@ import type { Timestamp } from 'firebase/firestore';
 export type ShopId = 'SHOP_A' | 'SHOP_S';
 export type CashAppRole = 'Admin' | 'Staff';
 export type CashAdjustmentDirection = 'add' | 'deduct';
+export type CashHistoryCategory = 'collections' | 'expenses' | 'transfers-in' | 'transfers-out';
 
 export interface StaffProfile {
   id: string;
@@ -79,9 +80,9 @@ export interface CashAdjustmentInput {
 
 export interface CashHistoryItem {
   id: string;
-  kind: 'expense' | 'transfer-in' | 'transfer-out' | 'adjustment-in' | 'adjustment-out';
+  kind: 'collection' | 'expense' | 'transfer-in' | 'transfer-out' | 'adjustment-in' | 'adjustment-out';
   amount: number;
   title: string;
   detail?: string;
-  createdAt?: Timestamp | null;
+  createdAt?: Timestamp | string | null;
 }
