@@ -876,7 +876,7 @@ button:disabled {
   background-color: #071025;
   background-image:
     linear-gradient(90deg, rgba(4, 9, 25, 0.18), rgba(5, 10, 28, 0.42) 48%, rgba(5, 10, 28, 0.18)),
-    url('/money-balance-bg.jpg');
+    url('/money-balance-bg.jpg?v=gold-20260817');
   background-position: center;
   background-size: cover;
   border: 1px solid rgba(65, 211, 154, 0.34);
