@@ -1,4 +1,11 @@
-import type { CashHistoryItem, ShopCashSummary, ShopId } from '../types';
+import type {
+  CashAdjustmentDirection,
+  CashBalanceSnapshot,
+  CashHistoryItem,
+  CashMovement,
+  ShopCashSummary,
+  ShopId
+} from '../types';
 
 export const MAX_MONEY_AMOUNT = 100_000_000;
 export const MAX_DESCRIPTION_LENGTH = 160;
@@ -11,6 +18,11 @@ export const parseMoneyInput = (value: string) => {
 
 export const isValidMoneyAmount = (amount: number) => {
   if (!Number.isFinite(amount) || amount <= 0 || amount > MAX_MONEY_AMOUNT) return false;
+  return Math.abs(amount * 100 - Math.round(amount * 100)) < 0.000001;
+};
+
+export const isValidOpeningBalance = (amount: number) => {
+  if (!Number.isFinite(amount) || amount < 0 || amount > MAX_MONEY_AMOUNT) return false;
   return Math.abs(amount * 100 - Math.round(amount * 100)) < 0.000001;
 };
 
@@ -27,6 +39,45 @@ export const formatMoney = (amount: number) => new Intl.NumberFormat('en-IN', {
   minimumFractionDigits: Number.isInteger(amount) ? 0 : 2,
   maximumFractionDigits: 2
 }).format(amount);
+
+const toMoney = (amount: number) => Math.round(amount * 100) / 100;
+
+export const createCashBalanceSnapshot = (summary: ShopCashSummary): CashBalanceSnapshot => ({
+  availableBalance: toMoney(summary.availableBalance),
+  totalCollections: toMoney(summary.totalCollections),
+  totalExpenses: toMoney(summary.totalExpenses),
+  totalTransferredIn: toMoney(summary.totalTransferredIn),
+  totalTransferredOut: toMoney(summary.totalTransferredOut),
+  openingBalance: toMoney(summary.openingBalance)
+});
+
+export const detectCashMovement = (
+  previous: CashBalanceSnapshot,
+  current: CashBalanceSnapshot
+): CashMovement | null => {
+  const balanceChange = toMoney(current.availableBalance - previous.availableBalance);
+  if (balanceChange === 0) return null;
+
+  const direction = balanceChange > 0 ? 'in' : 'out';
+  let kind: CashMovement['kind'] = 'adjustment';
+
+  if (direction === 'in') {
+    if (current.totalTransferredIn > previous.totalTransferredIn) kind = 'transfer-in';
+    else if (current.totalCollections > previous.totalCollections) kind = 'collection';
+    else if (current.openingBalance > previous.openingBalance) kind = 'initialization';
+  } else if (current.totalExpenses > previous.totalExpenses) {
+    kind = 'expense';
+  } else if (current.totalTransferredOut > previous.totalTransferredOut) {
+    kind = 'transfer-out';
+  }
+
+  return {
+    direction,
+    kind,
+    amount: Math.abs(balanceChange),
+    balance: current.availableBalance
+  };
+};
 
 export const applyExpenseToSummary = (summary: ShopCashSummary, amount: number): ShopCashSummary => ({
   ...summary,
@@ -53,6 +104,40 @@ export const applyTransferToSummary = (
       updatedAt: new Date().toISOString()
     };
 
+export const getCashAdjustmentDelta = (amount: number, direction: CashAdjustmentDirection) => (
+  direction === 'add' ? amount : -amount
+);
+
+export const applyAdjustmentToSummary = (
+  summary: ShopCashSummary,
+  amount: number,
+  direction: CashAdjustmentDirection
+): ShopCashSummary => ({
+  ...summary,
+  availableBalance: summary.availableBalance + getCashAdjustmentDelta(amount, direction),
+  updatedAt: new Date().toISOString()
+});
+
+export const isShopCashInitialized = (summary: ShopCashSummary | null) => Boolean(summary?.initializedAt);
+
+export const applyInitializationToSummary = (
+  summary: ShopCashSummary | null,
+  shopId: ShopId,
+  openingBalance: number,
+  initializedBy: string
+): ShopCashSummary => {
+  const current = summary || createEmptyShopSummary(shopId);
+  const updatedAt = new Date().toISOString();
+  return {
+    ...current,
+    availableBalance: current.availableBalance + openingBalance,
+    openingBalance,
+    initializedAt: updatedAt,
+    initializedBy,
+    updatedAt
+  };
+};
+
 const historyTime = (item: CashHistoryItem) => item.createdAt?.toMillis() ?? 0;
 
 export const mergeRecentHistory = (groups: CashHistoryItem[][], maximum = 20) => groups
@@ -66,5 +151,6 @@ export const createEmptyShopSummary = (shopId: ShopId): ShopCashSummary => ({
   totalCollections: 0,
   totalExpenses: 0,
   totalTransferredIn: 0,
-  totalTransferredOut: 0
+  totalTransferredOut: 0,
+  openingBalance: 0
 });

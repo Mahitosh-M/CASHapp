@@ -7,7 +7,7 @@ import {
   loginWithEmail,
   logoutUser
 } from '../services/authService';
-import type { ShopId, StaffProfile } from '../types';
+import type { CashAppRole, ShopId, StaffProfile } from '../types';
 
 interface AuthContextValue {
   firebaseUser: User | null;
@@ -15,7 +15,7 @@ interface AuthContextValue {
   currentShopId: ShopId | undefined;
   loading: boolean;
   authError: string;
-  login: (email: string, password: string) => Promise<void>;
+  login: (email: string, password: string, expectedRole: CashAppRole) => Promise<void>;
   logout: () => Promise<void>;
   setAdminShop: (shopId: ShopId) => void;
 }
@@ -29,6 +29,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [loading, setLoading] = useState(true);
   const [authError, setAuthError] = useState('');
   const requestId = useRef(0);
+  const expectedLoginRole = useRef<CashAppRole | null>(null);
 
   useEffect(() => listenToAuthState(async (currentUser) => {
     const activeRequest = ++requestId.current;
@@ -36,6 +37,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setFirebaseUser(currentUser);
 
     if (!currentUser) {
+      expectedLoginRole.current = null;
       setProfile(null);
       setLoading(false);
       return;
@@ -43,6 +45,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     try {
       const nextProfile = await loadCashAppProfile(currentUser);
+      const expectedRole = expectedLoginRole.current;
+      expectedLoginRole.current = null;
+      if (expectedRole && nextProfile.role !== expectedRole) {
+        throw new Error(`This account is registered as ${nextProfile.role}. Use ${nextProfile.role} login.`);
+      }
       if (activeRequest !== requestId.current) return;
       setProfile(nextProfile);
       setAuthError('');
@@ -57,11 +64,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   }), []);
 
-  const login = async (email: string, password: string) => {
+  const login = async (email: string, password: string, expectedRole: CashAppRole) => {
     setAuthError('');
+    expectedLoginRole.current = expectedRole;
     try {
       await loginWithEmail(email, password);
     } catch (error) {
+      expectedLoginRole.current = null;
       const message = getFriendlyLoginError(error);
       setAuthError(message);
       throw new Error(message);
@@ -73,6 +82,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setFirebaseUser(null);
     setProfile(null);
     setAdminShopId('SHOP_A');
+    expectedLoginRole.current = null;
     setAuthError('');
     await logoutUser();
   };

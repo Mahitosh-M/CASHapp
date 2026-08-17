@@ -4,6 +4,7 @@ import { LoadingScreen } from './components/LoadingScreen';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { CashProvider } from './context/CashContext';
 import { ExpensePage } from './pages/ExpensePage';
+import { AdminPage } from './pages/AdminPage';
 import { HistoryPage } from './pages/HistoryPage';
 import { HomePage } from './pages/HomePage';
 import { LoginPage } from './pages/LoginPage';
@@ -23,6 +24,7 @@ const AppRoutes = () => {
           <Route path="expense" element={<ExpensePage />} />
           <Route path="transfer" element={<TransferPage />} />
           <Route path="history" element={<HistoryPage />} />
+          <Route path="admin" element={profile.role === 'Admin' ? <AdminPage /> : <Navigate to="/" replace />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Route>
       </Routes>

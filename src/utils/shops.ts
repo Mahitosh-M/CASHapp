@@ -1,8 +1,8 @@
 import type { ShopId } from '../types';
 
 export const SHOP_OPTIONS = [
-  { id: 'SHOP_A', name: 'Shop A' },
-  { id: 'SHOP_S', name: 'Shop S' }
+  { id: 'SHOP_A', name: 'ASHOKA' },
+  { id: 'SHOP_S', name: 'SMPA' }
 ] as const satisfies ReadonlyArray<{ id: ShopId; name: string }>;
 
 export const isShopId = (value: unknown): value is ShopId => value === 'SHOP_A' || value === 'SHOP_S';

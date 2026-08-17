@@ -1,16 +1,25 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useAuth } from './AuthContext';
 import { getFriendlyCashError, getRecentCashHistory, getShopCash } from '../services/cashService';
-import type { CashHistoryItem, ShopCashSummary } from '../types';
-import { applyExpenseToSummary, applyTransferToSummary } from '../utils/cash';
+import type { CashAdjustmentDirection, CashHistoryItem, ShopCashSummary } from '../types';
+import {
+  applyAdjustmentToSummary,
+  applyExpenseToSummary,
+  applyInitializationToSummary,
+  applyTransferToSummary
+} from '../utils/cash';
+
+const SUMMARY_RESUME_COOLDOWN_MS = 30_000;
 
 interface CashContextValue {
   summary: ShopCashSummary | null;
   summaryLoading: boolean;
   summaryError: string;
   refreshSummary: () => Promise<void>;
+  applyInitializationLocally: (openingBalance: number, initializedBy: string) => void;
   applyExpenseLocally: (amount: number) => void;
   applyTransferLocally: (amount: number) => void;
+  applyAdjustmentLocally: (amount: number, direction: CashAdjustmentDirection) => void;
   history: CashHistoryItem[];
   historyLoading: boolean;
   historyError: string;
@@ -30,9 +39,11 @@ export const CashProvider = ({ children }: { children: ReactNode }) => {
   const [historyLoadedFor, setHistoryLoadedFor] = useState<string | null>(null);
   const summaryRequestId = useRef(0);
   const historyRequestId = useRef(0);
+  const lastSummaryReadAt = useRef(0);
 
   const refreshSummary = useCallback(async () => {
     if (!currentShopId) return;
+    lastSummaryReadAt.current = Date.now();
     const activeRequest = ++summaryRequestId.current;
     setSummaryLoading(true);
     setSummaryError('');
@@ -41,7 +52,6 @@ export const CashProvider = ({ children }: { children: ReactNode }) => {
       const nextSummary = await getShopCash(currentShopId);
       if (activeRequest !== summaryRequestId.current) return;
       setSummary(nextSummary);
-      if (!nextSummary) setSummaryError('Cash balance has not been initialized by Admin.');
     } catch (error) {
       if (activeRequest !== summaryRequestId.current) return;
       setSummary(null);
@@ -68,6 +78,22 @@ export const CashProvider = ({ children }: { children: ReactNode }) => {
     void refreshSummary();
   }, [currentShopId, firebaseUser, refreshSummary]);
 
+  useEffect(() => {
+    const refreshWhenVisible = () => {
+      if (
+        document.visibilityState !== 'visible'
+        || !currentShopId
+        || !firebaseUser
+        || Date.now() - lastSummaryReadAt.current < SUMMARY_RESUME_COOLDOWN_MS
+      ) return;
+
+      void refreshSummary();
+    };
+
+    document.addEventListener('visibilitychange', refreshWhenVisible);
+    return () => document.removeEventListener('visibilitychange', refreshWhenVisible);
+  }, [currentShopId, firebaseUser, refreshSummary]);
+
   const invalidateHistory = () => {
     setHistoryLoadedFor(null);
     setHistory([]);
@@ -79,8 +105,18 @@ export const CashProvider = ({ children }: { children: ReactNode }) => {
     invalidateHistory();
   };
 
+  const applyInitializationLocally = (openingBalance: number, initializedBy: string) => {
+    if (!currentShopId) return;
+    setSummary((current) => applyInitializationToSummary(current, currentShopId, openingBalance, initializedBy));
+  };
+
   const applyTransferLocally = (amount: number) => {
     setSummary((current) => current ? applyTransferToSummary(current, amount, 'out') : current);
+    invalidateHistory();
+  };
+
+  const applyAdjustmentLocally = (amount: number, direction: CashAdjustmentDirection) => {
+    setSummary((current) => current ? applyAdjustmentToSummary(current, amount, direction) : current);
     invalidateHistory();
   };
 
@@ -108,13 +144,15 @@ export const CashProvider = ({ children }: { children: ReactNode }) => {
     summaryLoading,
     summaryError,
     refreshSummary,
+    applyInitializationLocally,
     applyExpenseLocally,
     applyTransferLocally,
+    applyAdjustmentLocally,
     history,
     historyLoading,
     historyError,
     loadHistory
-  }), [history, historyError, historyLoading, loadHistory, refreshSummary, summary, summaryError, summaryLoading]);
+  }), [currentShopId, history, historyError, historyLoading, loadHistory, refreshSummary, summary, summaryError, summaryLoading]);
 
   return <CashContext.Provider value={value}>{children}</CashContext.Provider>;
 };

@@ -1,10 +1,26 @@
-import { ArrowRightLeft, History, Plus, RefreshCw, ReceiptText, TrendingDown, TrendingUp } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import {
+  ArrowRightLeft,
+  IndianRupee,
+  Landmark,
+  ReceiptIndianRupee,
+  ReceiptText,
+  TrendingDown,
+  TrendingUp
+} from 'lucide-react';
+import { useEffect, useState, type FormEvent } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useCash } from '../context/CashContext';
 import { useOnlineStatus } from '../hooks/useOnlineStatus';
-import { formatMoney } from '../utils/cash';
+import { getFriendlyCashError, initializeShopCash } from '../services/cashService';
+import {
+  MAX_MONEY_AMOUNT,
+  formatMoney,
+  isShopCashInitialized,
+  isValidOpeningBalance,
+  parseMoneyInput
+} from '../utils/cash';
+import { getShopName } from '../utils/shops';
 
 interface HomeLocationState {
   notice?: string;
@@ -22,12 +38,20 @@ const formatUpdatedAt = (value: ReturnType<typeof useCash>['summary'] extends in
 };
 
 export const HomePage = () => {
-  const { profile } = useAuth();
-  const { summary, summaryError, summaryLoading, refreshSummary } = useCash();
+  const { currentShopId, firebaseUser, profile } = useAuth();
+  const {
+    summary,
+    summaryError,
+    summaryLoading,
+    applyInitializationLocally
+  } = useCash();
   const online = useOnlineStatus();
   const navigate = useNavigate();
   const location = useLocation();
   const [notice, setNotice] = useState(() => (location.state as HomeLocationState | null)?.notice || '');
+  const [openingBalanceText, setOpeningBalanceText] = useState('0');
+  const [initializationError, setInitializationError] = useState('');
+  const [initializing, setInitializing] = useState(false);
 
   useEffect(() => {
     if (location.state) navigate(location.pathname, { replace: true, state: null });
@@ -39,37 +63,111 @@ export const HomePage = () => {
     return () => window.clearTimeout(timeout);
   }, [notice]);
 
-  const canUseBalance = Boolean(summary) && online && !summaryLoading;
+  useEffect(() => {
+    setOpeningBalanceText('0');
+    setInitializationError('');
+    setInitializing(false);
+  }, [currentShopId]);
+
+  const initialized = isShopCashInitialized(summary);
+  const needsInitialization = !summaryLoading && !summaryError && !initialized;
+  const canUseBalance = Boolean(summary) && initialized && online && !summaryLoading;
+
+  const handleInitialize = async (event: FormEvent) => {
+    event.preventDefault();
+    if (initializing) return;
+    if (!online) {
+      setInitializationError('Connect to the internet before initializing branch cash.');
+      return;
+    }
+    if (profile?.role !== 'Admin' || !currentShopId || !firebaseUser) {
+      setInitializationError('Only Admin can initialize branch cash.');
+      return;
+    }
+
+    const openingBalance = parseMoneyInput(openingBalanceText);
+    if (!isValidOpeningBalance(openingBalance)) {
+      setInitializationError('Enter zero or a valid opening amount with no more than two decimal places.');
+      return;
+    }
+
+    setInitializing(true);
+    setInitializationError('');
+    try {
+      await initializeShopCash({
+        shopId: currentShopId,
+        openingBalance,
+        createdBy: firebaseUser.uid
+      });
+      applyInitializationLocally(openingBalance, firebaseUser.uid);
+      setNotice(`${getShopName(currentShopId)} cash initialized successfully.`);
+    } catch (error) {
+      setInitializationError(getFriendlyCashError(error, 'initialize'));
+    } finally {
+      setInitializing(false);
+    }
+  };
 
   return (
     <div className="page home-page">
-      <section className="home-intro">
-        <div>
-          <span className="eyebrow">WELCOME</span>
-          <h1>{profile?.name || 'Staff'}</h1>
-        </div>
-        <button
-          className="icon-button refresh-button"
-          type="button"
-          onClick={() => void refreshSummary()}
-          disabled={summaryLoading || !online}
-          title="Refresh available amount"
-          aria-label="Refresh available amount"
-        >
-          <RefreshCw size={21} className={summaryLoading ? 'spin' : ''} />
-        </button>
-      </section>
-
       {notice ? <div className="notice success" role="status">{notice}</div> : null}
       {summaryError ? <div className="notice error" role="alert">{summaryError}</div> : null}
+      {needsInitialization && profile?.role === 'Staff' ? (
+        <div className="notice error" role="alert">Branch cash has not been initialized. Please contact Admin.</div>
+      ) : null}
 
       <section className="balance-panel" aria-label="Available amount">
         <div className="balance-label">AVAILABLE AMOUNT</div>
         {summaryLoading ? <div className="balance-skeleton" /> : <div className="balance-value">{formatMoney(summary?.availableBalance ?? 0)}</div>}
         <div className="balance-updated">
-          {summary?.updatedAt ? `Updated ${formatUpdatedAt(summary.updatedAt)}` : 'Live branch balance'}
+          {summary?.updatedAt ? `Updated ${formatUpdatedAt(summary.updatedAt)}` : 'Awaiting branch setup'}
         </div>
       </section>
+
+      <section className="home-actions" aria-label="Cash actions">
+        <button className="quick-action-tile expense-action" type="button" onClick={() => navigate('/expense')} disabled={!canUseBalance}>
+          <span className="quick-action-icon" aria-hidden="true"><ReceiptIndianRupee size={29} /></span>
+          <span>Add expense</span>
+        </button>
+        <button className="quick-action-tile transfer-action" type="button" onClick={() => navigate('/transfer')} disabled={!canUseBalance}>
+          <span className="quick-action-icon" aria-hidden="true"><ArrowRightLeft size={29} /></span>
+          <span>Transfer money</span>
+        </button>
+      </section>
+
+      {needsInitialization && profile?.role === 'Admin' ? (
+        <section className="initialization-panel" aria-labelledby="initialize-cash-title">
+          <div className="initialization-heading">
+            <div className="initialization-icon"><Landmark size={22} /></div>
+            <div>
+              <span className="eyebrow">ONE-TIME SETUP</span>
+              <h2 id="initialize-cash-title">Initialize {currentShopId ? getShopName(currentShopId) : 'branch'}</h2>
+            </div>
+          </div>
+          {initializationError ? <div className="notice error" role="alert">{initializationError}</div> : null}
+          <form className="initialization-form" onSubmit={handleInitialize}>
+            <label>
+              Opening cash to add
+              <span className="money-input">
+                <IndianRupee size={21} />
+                <input
+                  type="number"
+                  min="0"
+                  max={MAX_MONEY_AMOUNT}
+                  step="0.01"
+                  inputMode="decimal"
+                  value={openingBalanceText}
+                  onChange={(event) => setOpeningBalanceText(event.target.value)}
+                  disabled={initializing}
+                />
+              </span>
+            </label>
+            <button className="primary-button" type="submit" disabled={initializing || !online}>
+              <Landmark size={21} /> {initializing ? 'Initializing...' : 'Set opening balance'}
+            </button>
+          </form>
+        </section>
+      ) : null}
 
       <section className="summary-grid" aria-label="Cash totals">
         <div className="summary-item">
@@ -92,18 +190,6 @@ export const HomePage = () => {
           <span>Transferred out</span>
           <strong>{formatMoney(summary?.totalTransferredOut ?? 0)}</strong>
         </div>
-      </section>
-
-      <section className="home-actions" aria-label="Cash actions">
-        <button className="primary-button action-button" type="button" onClick={() => navigate('/expense')} disabled={!canUseBalance}>
-          <Plus size={23} /> Add expense
-        </button>
-        <button className="secondary-button action-button" type="button" onClick={() => navigate('/transfer')} disabled={!canUseBalance}>
-          <ArrowRightLeft size={23} /> Transfer money
-        </button>
-        <button className="text-action" type="button" onClick={() => navigate('/history')}>
-          <History size={21} /> View history
-        </button>
       </section>
     </div>
   );

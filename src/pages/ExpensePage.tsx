@@ -6,7 +6,15 @@ import { useAuth } from '../context/AuthContext';
 import { useCash } from '../context/CashContext';
 import { useOnlineStatus } from '../hooks/useOnlineStatus';
 import { createExpense, createExpenseId, getFriendlyCashError } from '../services/cashService';
-import { MAX_DESCRIPTION_LENGTH, MAX_MONEY_AMOUNT, formatMoney, isValidMoneyAmount, parseMoneyInput, validateDescription } from '../utils/cash';
+import {
+  MAX_DESCRIPTION_LENGTH,
+  MAX_MONEY_AMOUNT,
+  formatMoney,
+  isShopCashInitialized,
+  isValidMoneyAmount,
+  parseMoneyInput,
+  validateDescription
+} from '../utils/cash';
 
 export const ExpensePage = () => {
   const { currentShopId, firebaseUser } = useAuth();
@@ -30,7 +38,7 @@ export const ExpensePage = () => {
       setError('Connect to the internet before saving an expense.');
       return;
     }
-    if (!summary || !currentShopId || !firebaseUser) {
+    if (!summary || !isShopCashInitialized(summary) || !currentShopId || !firebaseUser) {
       setError('Available amount is not ready. Return home and refresh.');
       return;
     }
@@ -115,7 +123,11 @@ export const ExpensePage = () => {
           <span className="field-count">{description.length}/{MAX_DESCRIPTION_LENGTH}</span>
         </label>
 
-        <button className="primary-button submit-button" type="submit" disabled={submitting || !online || !summary}>
+        <button
+          className="primary-button submit-button"
+          type="submit"
+          disabled={submitting || !online || !summary || !isShopCashInitialized(summary)}
+        >
           <Save size={21} /> {submitting ? 'Saving...' : 'Save expense'}
         </button>
       </form>

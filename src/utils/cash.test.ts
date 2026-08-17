@@ -3,9 +3,15 @@ import { describe, expect, it } from 'vitest';
 import type { CashHistoryItem, ShopCashSummary } from '../types';
 import {
   MAX_MONEY_AMOUNT,
+  applyAdjustmentToSummary,
   applyExpenseToSummary,
+  applyInitializationToSummary,
   applyTransferToSummary,
+  createCashBalanceSnapshot,
+  detectCashMovement,
   isValidMoneyAmount,
+  isValidOpeningBalance,
+  isShopCashInitialized,
   mergeRecentHistory,
   parseMoneyInput,
   validateDescription
@@ -18,7 +24,8 @@ const summary: ShopCashSummary = {
   totalCollections: 20_000,
   totalExpenses: 2_000,
   totalTransferredIn: 500,
-  totalTransferredOut: 1_000
+  totalTransferredOut: 1_000,
+  openingBalance: 0
 };
 
 const historyItem = (id: string, milliseconds: number): CashHistoryItem => ({
@@ -48,6 +55,13 @@ describe('cash input validation', () => {
     expect(isValidMoneyAmount(MAX_MONEY_AMOUNT + 1)).toBe(false);
   });
 
+  it('allows zero only for the one-time opening balance', () => {
+    expect(isValidOpeningBalance(0)).toBe(true);
+    expect(isValidOpeningBalance(500.25)).toBe(true);
+    expect(isValidOpeningBalance(-1)).toBe(false);
+    expect(isValidOpeningBalance(1.001)).toBe(false);
+  });
+
   it('requires a trimmed expense explanation', () => {
     expect(validateDescription('   ')).toContain('reason');
     expect(validateDescription('Fuel')).toBeNull();
@@ -56,6 +70,18 @@ describe('cash input validation', () => {
 });
 
 describe('local summary updates', () => {
+  it('initializes an empty summary or adds opening cash to an existing CRM summary', () => {
+    const empty = applyInitializationToSummary(null, 'SHOP_A', 500, 'admin-1');
+    const existing = applyInitializationToSummary(summary, 'SHOP_A', 500, 'admin-1');
+
+    expect(empty.availableBalance).toBe(500);
+    expect(empty.totalCollections).toBe(0);
+    expect(existing.availableBalance).toBe(10_500);
+    expect(existing.totalCollections).toBe(20_000);
+    expect(existing.openingBalance).toBe(500);
+    expect(isShopCashInitialized(existing)).toBe(true);
+  });
+
   it('applies an expense without changing CRM collection totals', () => {
     const next = applyExpenseToSummary(summary, 750);
     expect(next.availableBalance).toBe(9_250);
@@ -73,6 +99,68 @@ describe('local summary updates', () => {
     expect(outgoing.totalCollections).toBe(20_000);
     expect(incoming.totalCollections).toBe(20_000);
   });
+
+  it('applies Admin adjustments without changing collection or activity totals', () => {
+    const added = applyAdjustmentToSummary(summary, 1_250, 'add');
+    const deducted = applyAdjustmentToSummary(summary, 750, 'deduct');
+
+    expect(added.availableBalance).toBe(11_250);
+    expect(deducted.availableBalance).toBe(9_250);
+    expect(added.totalCollections).toBe(summary.totalCollections);
+    expect(deducted.totalExpenses).toBe(summary.totalExpenses);
+  });
+});
+
+describe('cash movement detection', () => {
+  it('recognizes incoming CRM collections', () => {
+    const previous = createCashBalanceSnapshot(summary);
+    const current = createCashBalanceSnapshot({
+      ...summary,
+      availableBalance: 11_500,
+      totalCollections: 21_500
+    });
+
+    expect(detectCashMovement(previous, current)).toEqual({
+      direction: 'in',
+      kind: 'collection',
+      amount: 1_500,
+      balance: 11_500
+    });
+  });
+
+  it('recognizes expense reductions', () => {
+    const previous = createCashBalanceSnapshot(summary);
+    const current = createCashBalanceSnapshot(applyExpenseToSummary(summary, 750));
+
+    expect(detectCashMovement(previous, current)).toMatchObject({
+      direction: 'out',
+      kind: 'expense',
+      amount: 750
+    });
+  });
+
+  it('recognizes incoming and outgoing transfers', () => {
+    const previous = createCashBalanceSnapshot(summary);
+    const incoming = createCashBalanceSnapshot(applyTransferToSummary(summary, 2_000, 'in'));
+    const outgoing = createCashBalanceSnapshot(applyTransferToSummary(summary, 2_000, 'out'));
+
+    expect(detectCashMovement(previous, incoming)).toMatchObject({ direction: 'in', kind: 'transfer-in', amount: 2_000 });
+    expect(detectCashMovement(previous, outgoing)).toMatchObject({ direction: 'out', kind: 'transfer-out', amount: 2_000 });
+  });
+
+  it('does not create a popup when the available amount is unchanged', () => {
+    const snapshot = createCashBalanceSnapshot(summary);
+    expect(detectCashMovement(snapshot, snapshot)).toBeNull();
+  });
+
+  it('recognizes Admin additions and deductions as adjustments', () => {
+    const previous = createCashBalanceSnapshot(summary);
+    const added = createCashBalanceSnapshot(applyAdjustmentToSummary(summary, 500, 'add'));
+    const deducted = createCashBalanceSnapshot(applyAdjustmentToSummary(summary, 500, 'deduct'));
+
+    expect(detectCashMovement(previous, added)).toMatchObject({ direction: 'in', kind: 'adjustment', amount: 500 });
+    expect(detectCashMovement(previous, deducted)).toMatchObject({ direction: 'out', kind: 'adjustment', amount: 500 });
+  });
 });
 
 describe('bounded history and shops', () => {
@@ -89,6 +177,7 @@ describe('bounded history and shops', () => {
     expect(isShopId('SHOP_X')).toBe(false);
     expect(getOtherShopId('SHOP_A')).toBe('SHOP_S');
     expect(getOtherShopId('SHOP_S')).toBe('SHOP_A');
-    expect(getShopName('SHOP_S')).toBe('Shop S');
+    expect(getShopName('SHOP_A')).toBe('ASHOKA');
+    expect(getShopName('SHOP_S')).toBe('SMPA');
   });
 });

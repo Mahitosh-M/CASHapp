@@ -1,6 +1,6 @@
 # Cash App
 
-Lightweight mobile-first cash management for authorized Shop A and Shop S staff.
+Lightweight mobile-first cash management for authorized ASHOKA and SMPA staff.
 
 ## Project responsibilities
 
@@ -12,7 +12,7 @@ Keeping runtime data in the CRM project is required because Firebase Auth tokens
 
 ## Current status
 
-The application is implemented and can be built locally. It is not ready for production financial writes until the CRM's complete Firestore rules and `shopCash` schema are extended as described in [docs/CRM_FIRESTORE_INTEGRATION.md](docs/CRM_FIRESTORE_INTEGRATION.md).
+The application and matching CRM rules/index changes are implemented and rule-emulator tested locally. They still require a controlled end-to-end user test and an explicit production deployment before live financial writes are enabled. See [docs/CRM_FIRESTORE_INTEGRATION.md](docs/CRM_FIRESTORE_INTEGRATION.md).
 
 This repository deliberately configures Firebase Hosting only. It does not contain a deployable Firestore rules file, preventing a Cash App deployment from replacing the CRM's existing ruleset.
 
@@ -25,6 +25,8 @@ npm run dev
 
 The checked-in defaults point runtime Auth and Firestore to `cisapp-236ab`. Copy `.env.example` to `.env.local` only when environment-specific overrides are needed.
 
+For isolated integration testing, start Auth and Firestore emulators from the CISapp repository and set `VITE_USE_FIREBASE_EMULATORS=true` in `.env.local`. This prevents CashApp tests from writing production data.
+
 ## Verification
 
 ```powershell
@@ -35,15 +37,19 @@ npm run build
 ## Firestore behavior
 
 - Startup: Firebase Auth restore, one `users/{uid}` profile read, one assigned `shopCash/{shopId}` read.
-- Home refresh: one assigned summary read.
+- Foreground refresh after the app has been away for at least 30 seconds: one assigned summary read.
+- Initialization: one immutable audit write plus one summary write; Admin-only and one-time.
 - Expense: one `cashExpenses` create plus one own-shop summary update in one batch.
 - Transfer: one `shopTransfers` create plus two summary updates in one batch.
-- History: three bounded queries, only when History is opened; results remain cached during that app session.
+- Admin adjustment: one immutable `cashAdjustments` create plus one selected-shop summary update in one batch.
+- History: four bounded queries, only when History is opened; results remain cached during that app session.
 - No listeners, polling, Cloud Functions, payment scans, or customer-data reads.
+
+Admin and Staff use separate login commands on the same form, but both authenticate against the existing CIS Firebase Auth project. The CIS `users/{uid}.role` remains authoritative; selecting Admin login never grants or changes a role.
 
 ## Hosting
 
-After production integration is approved and tested:
+After the CISapp rules/indexes are approved, tested, and deployed:
 
 ```powershell
 npm run build

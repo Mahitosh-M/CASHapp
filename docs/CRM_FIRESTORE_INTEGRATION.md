@@ -1,4 +1,4 @@
-# CRM Firestore Integration Required
+# CRM Firestore Integration
 
 ## Discovered architecture
 
@@ -17,6 +17,7 @@ No compatible cash expense or inter-shop transfer collection exists, so the Cash
 ```text
 cashExpenses/{expenseId}
 shopTransfers/{transferId}
+cashAdjustments/{adjustmentId}
 ```
 
 The CRM remains the only writer of customer payment records and collection effects.
@@ -27,9 +28,9 @@ The supplied `cashapp-a213f` project currently has the Firestore API disabled. I
 
 Runtime Authentication and Firestore point to `cisapp-236ab`. A separate Cash App Firestore project cannot directly share CRM Auth identities or `shopCash` documents. Doing so would require duplicate accounts/data or paid backend synchronization, all of which violate the approved architecture.
 
-## Existing compatibility gaps
+## Implemented compatibility contract
 
-The CRM branch currently validates `shopCash` with exactly these fields:
+The CRM `big` branch now keeps the original required fields:
 
 ```text
 shopId
@@ -38,17 +39,20 @@ totalCollections
 updatedAt (ISO string)
 ```
 
-Its update rule also requires the `availableBalance` delta to equal the `totalCollections` delta. That is correct for a CRM receipt but intentionally rejects Cash App expenses and transfers.
-
-Before live Cash App use, the CRM's complete ruleset must be extended to accept optional numeric fields:
+and accepts Cash App-managed fields:
 
 ```text
 totalExpenses
 totalTransferredIn
 totalTransferredOut
+openingBalance
+initializedAt
+initializedBy
+lastCashOperationId
+lastCashOperationType
 ```
 
-The Cash App keeps `shopCash.updatedAt` as an ISO string for CRM compatibility. Expense and transfer audit records use Firestore server timestamps.
+CRM receipt effects carry the payment ID and are accepted only when the rules derive the same exact before/after `cashSyncedAmount` delta from the matching payment mutation. Invoice deletion uses an Admin-only aggregate reversal marker because one invoice can remove several linked payment documents atomically. Expense, transfer, and Admin adjustment deltas require a newly created immutable audit document in the same batch. The Cash App keeps `shopCash.updatedAt` as an ISO string for CRM compatibility; authoritative audit and initialization times use Firestore server timestamps.
 
 ## Required rule behavior
 
@@ -62,12 +66,15 @@ The CRM rules should be extended in the CRM repository, reviewed, emulator-teste
 6. Staff cannot update or delete transfer audit records.
 7. An expense batch may change only `availableBalance`, `totalExpenses`, and `updatedAt` on the sender summary, with matching opposite/positive amount deltas.
 8. A transfer batch may change only sender balance/out total and receiver balance/in total. It must never change `totalCollections`.
-9. Staff cannot directly create a Shop A expense from Shop S or vice versa.
-10. CRM payment batches must retain their current collection behavior and legacy-record compatibility.
+9. ASHOKA staff cannot directly create an SMPA expense, or vice versa.
+10. CRM payment batches must retain their current collection behavior and legacy-record compatibility, and each normal summary delta must be linked to the exact matching payment mutation.
 11. Resulting balances should not be negative where the rule design can enforce this safely.
 12. Reusing an existing expense or transfer document ID must be denied to reduce manual retry duplication risk.
+13. Admin initialization must create `cashInitializations/{shopId}` once and preserve any CRM collections already tracked.
+14. Only Admin can create a manual adjustment, and its add/deduct amount must exactly match the selected shop summary delta.
+15. Adjustment records are immutable, require a nonblank reason, and cannot make the available amount negative.
 
-Cross-document validation should use the new audit record in the same atomic batch where practical. A broad rule allowing Staff to freely increment/decrement `shopCash` would not provide adequate financial integrity.
+Cross-document validation uses `getAfter()` to prove the immutable record and exact summary effects are in the same atomic batch. Staff do not receive broad summary write access.
 
 ## Required indexes
 
@@ -79,15 +86,16 @@ History then performs these bounded queries only after the History page opens:
 cashExpenses: shopId == assigned shop, createdAt desc, limit 10
 shopTransfers: fromShopId == assigned shop, createdAt desc, limit 10
 shopTransfers: toShopId == assigned shop, createdAt desc, limit 10
+cashAdjustments: shopId == assigned shop, createdAt desc, limit 10
 ```
 
 ## Safe rollout order
 
-1. Add and emulator-test the complete CRM rule/index changes on CRM branch `big`.
-2. Test Cash App against Firebase emulators using fake Admin, Shop A Staff, Shop S Staff, and invalid users.
+1. Emulator-test the complete CRM rule/index changes on CRM branch `big`.
+2. Test Cash App against Firebase emulators using fake Admin, ASHOKA Staff, SMPA Staff, and invalid users.
 3. Verify legacy CRM invoice/payment workflows against the updated rules.
 4. Deploy CRM rules and indexes without deploying Cash App Hosting.
 5. Run a controlled Cash App test using initialized branch summaries and test audit entries.
 6. Deploy Cash App Hosting only after the controlled test passes.
 
-No production Firebase write, rules deployment, index deployment, or Hosting deployment has been performed from this repository.
+No production Firebase write, rules deployment, index deployment, or Hosting deployment is performed by these local code changes.

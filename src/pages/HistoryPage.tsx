@@ -1,4 +1,4 @@
-import { ArrowDownLeft, ArrowUpRight, History, ReceiptText, RefreshCw } from 'lucide-react';
+import { ArrowDownLeft, ArrowUpRight, CircleMinus, CirclePlus, History, ReceiptText, RefreshCw } from 'lucide-react';
 import { useEffect } from 'react';
 import { PageHeader } from '../components/PageHeader';
 import { useCash } from '../context/CashContext';
@@ -21,6 +21,8 @@ const formatActivityTime = (item: CashHistoryItem) => {
 const ActivityIcon = ({ kind }: { kind: CashHistoryItem['kind'] }) => {
   if (kind === 'transfer-in') return <ArrowDownLeft size={21} />;
   if (kind === 'transfer-out') return <ArrowUpRight size={21} />;
+  if (kind === 'adjustment-in') return <CirclePlus size={21} />;
+  if (kind === 'adjustment-out') return <CircleMinus size={21} />;
   return <ReceiptText size={21} />;
 };
 
@@ -34,7 +36,7 @@ export const HistoryPage = () => {
   return (
     <div className="page history-page">
       <div className="history-heading-row">
-        <PageHeader title="History" subtitle="Recent expenses and transfers" />
+        <PageHeader title="History" subtitle="Recent cash activity" />
         <button
           className="icon-button refresh-button"
           type="button"
@@ -66,7 +68,7 @@ export const HistoryPage = () => {
       {history.length > 0 ? (
         <div className="history-list">
           {history.map((item) => {
-            const positive = item.kind === 'transfer-in';
+            const positive = item.kind === 'transfer-in' || item.kind === 'adjustment-in';
             return (
               <article className={`history-row ${positive ? 'positive' : 'negative'}`} key={`${item.kind}-${item.id}`}>
                 <div className="history-icon"><ActivityIcon kind={item.kind} /></div>

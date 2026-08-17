@@ -6,7 +6,14 @@ import { useAuth } from '../context/AuthContext';
 import { useCash } from '../context/CashContext';
 import { useOnlineStatus } from '../hooks/useOnlineStatus';
 import { createTransfer, createTransferId, getFriendlyCashError } from '../services/cashService';
-import { MAX_DESCRIPTION_LENGTH, MAX_MONEY_AMOUNT, formatMoney, isValidMoneyAmount, parseMoneyInput } from '../utils/cash';
+import {
+  MAX_DESCRIPTION_LENGTH,
+  MAX_MONEY_AMOUNT,
+  formatMoney,
+  isShopCashInitialized,
+  isValidMoneyAmount,
+  parseMoneyInput
+} from '../utils/cash';
 import { getOtherShopId, getShopName } from '../utils/shops';
 
 export const TransferPage = () => {
@@ -30,7 +37,9 @@ export const TransferPage = () => {
 
   const validate = () => {
     if (!online) return 'Connect to the internet before transferring money.';
-    if (!summary || !currentShopId || !destinationShopId || !firebaseUser) return 'Available amount is not ready. Return home and refresh.';
+    if (!summary || !isShopCashInitialized(summary) || !currentShopId || !destinationShopId || !firebaseUser) {
+      return 'Available amount is not ready. Return home and refresh.';
+    }
     if (!isValidMoneyAmount(amount)) return 'Enter a valid amount greater than zero, with no more than two decimal places.';
     if (amount > summary.availableBalance) return 'Insufficient available amount.';
     if (note.trim().length > MAX_DESCRIPTION_LENGTH) return `Keep the note within ${MAX_DESCRIPTION_LENGTH} characters.`;
@@ -134,7 +143,11 @@ export const TransferPage = () => {
           <span className="field-count">{note.length}/{MAX_DESCRIPTION_LENGTH}</span>
         </label>
 
-        <button className="primary-button submit-button" type="submit" disabled={submitting || !online || !summary}>
+        <button
+          className="primary-button submit-button"
+          type="submit"
+          disabled={submitting || !online || !summary || !isShopCashInitialized(summary)}
+        >
           <ArrowRightLeft size={21} /> Transfer
         </button>
       </form>
