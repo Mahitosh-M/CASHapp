@@ -6,6 +6,7 @@ import {
   applyAdjustmentToSummary,
   applyExpenseToSummary,
   applyInitializationToSummary,
+  applyTransferDeletionToSummary,
   applyTransferToSummary
 } from '../utils/cash';
 
@@ -20,6 +21,7 @@ interface CashContextValue {
   applyExpenseLocally: (amount: number) => void;
   applyTransferLocally: (amount: number) => void;
   applyTransferEditLocally: (amountDifference: number) => void;
+  applyTransferDeletionLocally: (amount: number) => void;
   applyAdjustmentLocally: (amount: number, direction: CashAdjustmentDirection) => void;
 }
 
@@ -100,6 +102,12 @@ export const CashProvider = ({ children }: { children: ReactNode }) => {
       : current);
   };
 
+  const applyTransferDeletionLocally = (amount: number) => {
+    setSummary((current) => current
+      ? applyTransferDeletionToSummary(current, amount)
+      : current);
+  };
+
   const applyAdjustmentLocally = (amount: number, direction: CashAdjustmentDirection) => {
     setSummary((current) => current ? applyAdjustmentToSummary(current, amount, direction) : current);
   };
@@ -113,6 +121,7 @@ export const CashProvider = ({ children }: { children: ReactNode }) => {
     applyExpenseLocally,
     applyTransferLocally,
     applyTransferEditLocally,
+    applyTransferDeletionLocally,
     applyAdjustmentLocally,
   }), [currentShopId, refreshSummary, summary, summaryError, summaryLoading]);
 

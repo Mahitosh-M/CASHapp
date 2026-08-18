@@ -786,6 +786,7 @@ button:disabled {
 
 .primary-button,
 .secondary-button,
+.danger-button,
 .text-action {
   display: inline-flex;
   min-width: 0;
@@ -817,6 +818,18 @@ button:disabled {
   background: #ffffff;
   border: 1px solid #bfc3d8;
   box-shadow: 0 6px 16px rgba(22, 24, 63, 0.07);
+}
+
+.danger-button {
+  color: #ffffff;
+  background: #a62940;
+  border: 1px solid #d7687b;
+  box-shadow: 0 8px 18px rgba(164, 34, 62, 0.24);
+}
+
+.danger-button:not(:disabled):active {
+  background: #8e1f35;
+  transform: translateY(1px);
 }
 
 .text-action {
@@ -1405,6 +1418,11 @@ button:disabled {
   margin-top: 4px;
 }
 
+.transfer-delete-button {
+  width: 100%;
+  margin-top: 12px;
+}
+
 .transfer-route {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 40px minmax(0, 1fr);
@@ -1617,6 +1635,12 @@ button:disabled {
 .confirm-icon.transfer-confirm-icon {
   background: linear-gradient(135deg, rgba(255, 102, 127, 0.18), rgba(69, 229, 162, 0.18));
   border: 1px solid rgba(91, 211, 181, 0.34);
+}
+
+.confirm-icon.delete-confirm-icon {
+  color: #ffffff;
+  background: #a62940;
+  border: 1px solid #d7687b;
 }
 
 .history-row {

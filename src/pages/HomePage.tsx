@@ -7,7 +7,7 @@ import {
   ReceiptText,
   TrendingDown
 } from 'lucide-react';
-import { useEffect, useState, type FormEvent } from 'react';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { CashFlowArrows } from '../components/CashFlowArrows';
 import { WholeRupeeInput } from '../components/WholeRupeeInput';
@@ -44,6 +44,7 @@ export const HomePage = () => {
     summary,
     summaryError,
     summaryLoading,
+    refreshSummary,
     applyInitializationLocally
   } = useCash();
   const online = useOnlineStatus();
@@ -53,6 +54,15 @@ export const HomePage = () => {
   const [openingBalanceText, setOpeningBalanceText] = useState('0');
   const [initializationError, setInitializationError] = useState('');
   const [initializing, setInitializing] = useState(false);
+  const skipRefreshAfterInitialLoad = useRef(summaryLoading);
+  const pageRefreshHandled = useRef(false);
+
+  useEffect(() => {
+    if (pageRefreshHandled.current || summaryLoading) return;
+    pageRefreshHandled.current = true;
+    if (skipRefreshAfterInitialLoad.current) return;
+    void refreshSummary();
+  }, [refreshSummary, summaryLoading]);
 
   useEffect(() => {
     if (location.state) navigate(location.pathname, { replace: true, state: null });

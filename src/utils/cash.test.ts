@@ -6,6 +6,7 @@ import {
   applyAdjustmentToSummary,
   applyExpenseToSummary,
   applyInitializationToSummary,
+  applyTransferDeletionToSummary,
   applyTransferToSummary,
   createCashBalanceSnapshot,
   detectCashMovement,
@@ -130,6 +131,14 @@ describe('local summary updates', () => {
     expect(increased.totalTransferredOut).toBe(1_050);
     expect(reduced.availableBalance).toBe(10_050);
     expect(reduced.totalTransferredOut).toBe(950);
+  });
+
+  it('reverses an outgoing transfer when Admin deletes it', () => {
+    const next = applyTransferDeletionToSummary(summary, 200);
+
+    expect(next.availableBalance).toBe(10_200);
+    expect(next.totalTransferredOut).toBe(800);
+    expect(next.totalCollections).toBe(summary.totalCollections);
   });
 
   it('applies Admin adjustments without changing collection or activity totals', () => {

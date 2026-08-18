@@ -1,4 +1,4 @@
-import { IndianRupee, Save } from 'lucide-react';
+import { IndianRupee, Save, Trash2 } from 'lucide-react';
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { Navigate, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { CashFlowArrows } from '../components/CashFlowArrows';
@@ -9,6 +9,7 @@ import { useCash } from '../context/CashContext';
 import { useOnlineStatus } from '../hooks/useOnlineStatus';
 import {
   INSUFFICIENT_TRANSFER_EDIT_BALANCE,
+  deleteTransfer,
   getFriendlyCashError,
   getTransfer,
   updateTransfer
@@ -35,8 +36,8 @@ const getReturnPath = (state: EditTransferLocationState | null) => (
 
 export const EditTransferPage = () => {
   const { transferId } = useParams<{ transferId: string }>();
-  const { currentShopId, firebaseUser } = useAuth();
-  const { summary, applyTransferEditLocally } = useCash();
+  const { currentShopId, firebaseUser, profile } = useAuth();
+  const { summary, applyTransferEditLocally, applyTransferDeletionLocally } = useCash();
   const online = useOnlineStatus();
   const location = useLocation();
   const navigate = useNavigate();
@@ -48,6 +49,7 @@ export const EditTransferPage = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [confirming, setConfirming] = useState(false);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
@@ -55,6 +57,8 @@ export const EditTransferPage = () => {
     setTransfer(null);
     setLoading(true);
     setError('');
+    setConfirming(false);
+    setConfirmingDelete(false);
 
     if (!transferId || !currentShopId) {
       setLoading(false);
@@ -156,6 +160,36 @@ export const EditTransferPage = () => {
     }
   };
 
+  const handleDeletePrepare = () => {
+    if (submitting) return;
+    if (!online) {
+      setError('Connect to the internet before deleting this transfer.');
+      return;
+    }
+    if (profile?.role !== 'Admin' || !transfer || !firebaseUser) {
+      setError('Only Admin can delete a transfer.');
+      return;
+    }
+    setError('');
+    setConfirmingDelete(true);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (submitting || profile?.role !== 'Admin' || !transfer || !firebaseUser) return;
+    setSubmitting(true);
+    setError('');
+    try {
+      const deletedTransfer = await deleteTransfer(transfer.id);
+      applyTransferDeletionLocally(deletedTransfer.amount);
+      navigate(returnTo, { replace: true });
+    } catch (deleteError) {
+      setConfirmingDelete(false);
+      setError(getFriendlyCashError(deleteError, 'transfer-delete'));
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   const differenceLabel = amountDifference > 0
     ? `Increase by ${formatMoney(amountDifference)}`
     : amountDifference < 0
@@ -213,6 +247,16 @@ export const EditTransferPage = () => {
           <button className="primary-button submit-button" type="submit" disabled={submitting || !online}>
             <Save size={21} /> Review changes
           </button>
+          {profile?.role === 'Admin' ? (
+            <button
+              className="danger-button transfer-delete-button"
+              type="button"
+              disabled={submitting || !online}
+              onClick={handleDeletePrepare}
+            >
+              <Trash2 size={20} /> Delete transfer
+            </button>
+          ) : null}
         </form>
       ) : null}
 
@@ -231,6 +275,37 @@ export const EditTransferPage = () => {
               </button>
               <button className="primary-button" type="button" disabled={submitting} onClick={() => void handleConfirm()}>
                 {submitting ? 'Updating...' : 'Confirm'}
+              </button>
+            </div>
+          </section>
+        </div>
+      ) : null}
+
+      {confirmingDelete && transfer ? (
+        <div className="modal-backdrop" role="presentation">
+          <section className="confirm-dialog" role="dialog" aria-modal="true" aria-labelledby="confirm-transfer-delete-title">
+            <div className="confirm-icon delete-confirm-icon"><Trash2 size={23} /></div>
+            <h2 id="confirm-transfer-delete-title">Delete transfer?</h2>
+            <p>
+              Delete <strong>{formatMoney(transfer.amount)}</strong> from {getShopName(transfer.fromShopId)} to{' '}
+              {getShopName(transfer.toShopId)}? Both shop balances will be reversed.
+            </p>
+            <div className="dialog-actions">
+              <button
+                className="secondary-button"
+                type="button"
+                disabled={submitting}
+                onClick={() => setConfirmingDelete(false)}
+              >
+                Cancel
+              </button>
+              <button
+                className="danger-button"
+                type="button"
+                disabled={submitting}
+                onClick={() => void handleDeleteConfirm()}
+              >
+                <Trash2 size={19} /> {submitting ? 'Deleting...' : 'Delete'}
               </button>
             </div>
           </section>

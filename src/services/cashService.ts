@@ -194,14 +194,12 @@ export const updateTransfer = async (input: ShopTransferUpdateInput) => runTrans
     const senderRef = doc(db, SHOP_CASH, existing.fromShopId);
     const receiverRef = doc(db, SHOP_CASH, existing.toShopId);
     const senderSnapshot = await transaction.get(senderRef);
-    const receiverSnapshot = await transaction.get(receiverRef);
-    if (!senderSnapshot.exists() || !receiverSnapshot.exists()) {
+    if (!senderSnapshot.exists()) {
       throw new Error('Both shop balances must be initialized before editing this transfer.');
     }
 
     const sender = senderSnapshot.data();
-    const receiver = receiverSnapshot.data();
-    if (!sender.initializedAt || !receiver.initializedAt) {
+    if (!sender.initializedAt) {
       throw new Error('Both shop balances must be initialized before editing this transfer.');
     }
 
@@ -211,15 +209,15 @@ export const updateTransfer = async (input: ShopTransferUpdateInput) => runTrans
     }
 
     transaction.update(senderRef, {
-      availableBalance: nextSenderBalance,
-      totalTransferredOut: numberOrZero(sender.totalTransferredOut) + amountDifference,
+      availableBalance: increment(-amountDifference),
+      totalTransferredOut: increment(amountDifference),
       lastCashOperationId: input.id,
       lastCashOperationType: 'transfer_edit',
       updatedAt
     });
     transaction.update(receiverRef, {
-      availableBalance: numberOrZero(receiver.availableBalance) + amountDifference,
-      totalTransferredIn: numberOrZero(receiver.totalTransferredIn) + amountDifference,
+      availableBalance: increment(amountDifference),
+      totalTransferredIn: increment(amountDifference),
       lastCashOperationId: input.id,
       lastCashOperationType: 'transfer_edit',
       updatedAt
@@ -240,6 +238,54 @@ export const updateTransfer = async (input: ShopTransferUpdateInput) => runTrans
     fromShopId: existing.fromShopId,
     toShopId: existing.toShopId
   };
+});
+
+export const deleteTransfer = async (transferId: string) => runTransaction(db, async (transaction) => {
+  const transferRef = doc(db, SHOP_TRANSFERS, transferId);
+  const transferSnapshot = await transaction.get(transferRef);
+  const existing = transferSnapshot.exists()
+    ? mapTransferRecord(transferSnapshot.id, transferSnapshot.data())
+    : null;
+  if (!existing) throw new Error('Transfer entry was not found.');
+
+  const senderRef = doc(db, SHOP_CASH, existing.fromShopId);
+  const receiverRef = doc(db, SHOP_CASH, existing.toShopId);
+  const senderSnapshot = await transaction.get(senderRef);
+  const receiverSnapshot = await transaction.get(receiverRef);
+  if (!senderSnapshot.exists() || !receiverSnapshot.exists()) {
+    throw new Error('Both shop balances must be initialized before deleting this transfer.');
+  }
+
+  const sender = senderSnapshot.data();
+  const receiver = receiverSnapshot.data();
+  if (!sender.initializedAt || !receiver.initializedAt) {
+    throw new Error('Both shop balances must be initialized before deleting this transfer.');
+  }
+  if (
+    numberOrZero(sender.totalTransferredOut) < existing.amount
+    || numberOrZero(receiver.totalTransferredIn) < existing.amount
+  ) {
+    throw new Error('Transfer totals are inconsistent. The transfer was not deleted.');
+  }
+
+  const updatedAt = new Date().toISOString();
+  transaction.update(senderRef, {
+    availableBalance: increment(existing.amount),
+    totalTransferredOut: increment(-existing.amount),
+    lastCashOperationId: existing.id,
+    lastCashOperationType: 'transfer_delete',
+    updatedAt
+  });
+  transaction.update(receiverRef, {
+    availableBalance: increment(-existing.amount),
+    totalTransferredIn: increment(-existing.amount),
+    lastCashOperationId: existing.id,
+    lastCashOperationType: 'transfer_delete',
+    updatedAt
+  });
+  transaction.delete(transferRef);
+
+  return existing;
 });
 
 export const createCashAdjustment = async (input: CashAdjustmentInput) => {
@@ -456,7 +502,7 @@ export const getCashPreviousHistoryDates = async (
 
 export const getFriendlyCashError = (
   error: unknown,
-  action: 'load' | 'initialize' | 'expense' | 'transfer' | 'adjustment' | 'history'
+  action: 'load' | 'initialize' | 'expense' | 'transfer' | 'transfer-delete' | 'adjustment' | 'history'
 ) => {
   console.error(`Cash App ${action} error`, error);
   const code = typeof error === 'object' && error !== null && 'code' in error
@@ -469,6 +515,7 @@ export const getFriendlyCashError = (
   if (action === 'initialize') return 'Branch cash could not be initialized. Please try again.';
   if (action === 'expense') return 'Expense could not be saved. Please try again.';
   if (action === 'transfer') return 'Transfer was not completed. No amount was moved.';
+  if (action === 'transfer-delete') return 'Transfer was not deleted. No balances were changed.';
   if (action === 'adjustment') return 'The available amount was not adjusted. Please try again.';
   if (action === 'history') return 'History could not be loaded. Please try again.';
   return 'Available amount could not be loaded. Please try again.';

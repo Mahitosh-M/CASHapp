@@ -106,6 +106,16 @@ export const applyTransferToSummary = (
       updatedAt: new Date().toISOString()
     };
 
+export const applyTransferDeletionToSummary = (
+  summary: ShopCashSummary,
+  amount: number
+): ShopCashSummary => ({
+  ...summary,
+  availableBalance: summary.availableBalance + amount,
+  totalTransferredOut: summary.totalTransferredOut - amount,
+  updatedAt: new Date().toISOString()
+});
+
 export const getCashAdjustmentDelta = (amount: number, direction: CashAdjustmentDirection) => (
   direction === 'add' ? amount : -amount
 );
