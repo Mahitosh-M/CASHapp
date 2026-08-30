@@ -5,7 +5,6 @@ export interface ExpenseCategoryTotal {
   category: ExpenseCategory;
   label: string;
   amount: number;
-  count: number;
 }
 
 export interface CashAccountingReport {
@@ -22,9 +21,6 @@ export interface CashAccountingReport {
   cashInflows: number;
   cashOutflows: number;
   netCashFlow: number;
-  cashAsset: number;
-  cashDeficit: number;
-  netCashPosition: number;
   expenseCategories: ExpenseCategoryTotal[];
 }
 
@@ -49,21 +45,17 @@ interface CashAccountingOptions {
 }
 
 export const buildCashAccountingReport = (
-  collections: CashHistoryItem[],
-  expenses: CashHistoryItem[],
-  availableBalance: number,
-  cashFlowItems: CashHistoryItem[] = [...collections, ...expenses],
+  cashFlowItems: CashHistoryItem[],
   options: CashAccountingOptions = {}
 ): CashAccountingReport => {
-  const expenseTotals = new Map<ExpenseCategory, { amount: number; count: number }>();
+  const collections = cashFlowItems.filter((item) => item.kind === 'collection');
+  const expenses = cashFlowItems.filter((item) => item.kind === 'expense');
+  const expenseTotals = new Map<ExpenseCategory, number>();
 
   expenses.forEach((expense) => {
     const category = normalizeExpenseCategory(expense.expenseCategory);
     if (category === 'purchases' || category === 'emi') return;
-    const current = expenseTotals.get(category) ?? { amount: 0, count: 0 };
-    current.amount += Math.max(0, expense.amount);
-    current.count += 1;
-    expenseTotals.set(category, current);
+    expenseTotals.set(category, (expenseTotals.get(category) ?? 0) + Math.max(0, expense.amount));
   });
 
   const collectionTotal = sumAmounts(collections);
@@ -84,7 +76,6 @@ export const buildCashAccountingReport = (
   const adjustmentsOut = sumKind(cashFlowItems, 'adjustment-out');
   const cashInflows = collectionTotal + transfersIn + adjustmentsIn;
   const cashOutflows = purchaseTotal + emiTotal + operatingExpenseTotal + transfersOut + adjustmentsOut;
-  const netCashPosition = Number.isFinite(availableBalance) ? availableBalance : 0;
 
   return {
     collections: collectionTotal,
@@ -100,14 +91,10 @@ export const buildCashAccountingReport = (
     cashInflows,
     cashOutflows,
     netCashFlow: cashInflows - cashOutflows,
-    cashAsset: Math.max(0, netCashPosition),
-    cashDeficit: Math.max(0, -netCashPosition),
-    netCashPosition,
     expenseCategories: EXPENSE_CATEGORIES.map((category) => ({
       category: category.id,
       label: category.label,
-      amount: expenseTotals.get(category.id)?.amount ?? 0,
-      count: expenseTotals.get(category.id)?.count ?? 0
+      amount: expenseTotals.get(category.id) ?? 0
     }))
   };
 };

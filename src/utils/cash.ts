@@ -140,7 +140,7 @@ export const applyTransferDeletionToSummary = (
   updatedAt: new Date().toISOString()
 });
 
-export const getCashAdjustmentDelta = (amount: number, direction: CashAdjustmentDirection) => (
+const getCashAdjustmentDelta = (amount: number, direction: CashAdjustmentDirection) => (
   direction === 'add' ? amount : -amount
 );
 
@@ -186,10 +186,6 @@ const historyTime = (item: CashHistoryItem) => {
 export const sortCashHistory = (groups: CashHistoryItem[][]) => groups
   .flat()
   .sort((left, right) => historyTime(right) - historyTime(left));
-
-export const mergeRecentHistory = (groups: CashHistoryItem[][], maximum = 20) => (
-  sortCashHistory(groups).slice(0, maximum)
-);
 
 export const createEmptyShopSummary = (shopId: ShopId): ShopCashSummary => ({
   shopId,

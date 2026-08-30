@@ -17,7 +17,6 @@ import {
   isValidMoneyAmount,
   isValidOpeningBalance,
   isShopCashInitialized,
-  mergeRecentHistory,
   parseMoneyInput,
   sortCashHistory,
   validateDescription
@@ -237,14 +236,6 @@ describe('cash movement detection', () => {
 });
 
 describe('bounded history and shops', () => {
-  it('merges activity by newest timestamp and respects the display limit', () => {
-    const rows = mergeRecentHistory([
-      [historyItem('old', 1_000), historyItem('new', 4_000)],
-      [historyItem('middle', 2_000)]
-    ], 2);
-    expect(rows.map((row) => row.id)).toEqual(['new', 'middle']);
-  });
-
   it('sorts CIS collection dates stored as ISO strings with CashApp timestamps', () => {
     const timestampRow = historyItem('timestamp', 2_000);
     const stringRow: CashHistoryItem = {
@@ -252,7 +243,7 @@ describe('bounded history and shops', () => {
       createdAt: new Date(3_000).toISOString()
     };
 
-    expect(mergeRecentHistory([[timestampRow], [stringRow]]).map((row) => row.id))
+    expect(sortCashHistory([[timestampRow], [stringRow]]).map((row) => row.id))
       .toEqual(['string', 'timestamp']);
   });
 

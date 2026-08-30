@@ -3,15 +3,11 @@ import {
   ArrowUpRight,
   CalendarDays,
   Combine,
-  PackagePlus,
   RefreshCw,
-  Scale,
-  TrendingDown,
-  TrendingUp,
-  WalletCards
+  TrendingUp
 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { getCashHistoryMonth, getFriendlyCashError, getShopCash } from '../services/cashService';
+import { getCashHistoryMonth, getFriendlyCashError } from '../services/cashService';
 import type { ShopId } from '../types';
 import {
   buildCashAccountingReport,
@@ -21,7 +17,6 @@ import {
 import { formatMoney } from '../utils/cash';
 import { getHistoryMonth, getHistoryMonthBounds, getHistoryMonthKey, getHistoryMonthLabel } from '../utils/historyMonths';
 import { SHOP_OPTIONS, getShopName } from '../utils/shops';
-import { ExpenseCategoryIcon } from './ExpenseCategoryIcon';
 
 const currentMonth = getHistoryMonth(new Date());
 const currentMonthKey = getHistoryMonthKey(currentMonth);
@@ -51,7 +46,9 @@ const parseMonthKey = (monthKey: string) => {
     : currentMonth;
 };
 
-export const AdminAccountingReport = ({ shopId, availableBalance }: { shopId: ShopId; availableBalance: number }) => {
+const formatDeduction = (amount: number) => amount > 0 ? `(${formatMoney(amount)})` : formatMoney(0);
+
+export const AdminAccountingReport = ({ shopId }: { shopId: ShopId }) => {
   const [period, setPeriod] = useState<ReportPeriod>('month');
   const [statement, setStatement] = useState<ReportStatement>('cash-flow');
   const [monthKey, setMonthKey] = useState(currentMonthKey);
@@ -80,18 +77,12 @@ export const AdminAccountingReport = ({ shopId, availableBalance }: { shopId: Sh
 
   const loadReport = useCallback(async () => {
     const { start, end } = reportRange;
-    const [historyGroups, summaries] = await Promise.all([
-      Promise.all(reportShopIds.map((reportShopId) => getCashHistoryMonth(reportShopId, start, end))),
-      combined ? Promise.all(reportShopIds.map((reportShopId) => getShopCash(reportShopId))) : Promise.resolve([])
-    ]);
+    const historyGroups = await Promise.all(
+      reportShopIds.map((reportShopId) => getCashHistoryMonth(reportShopId, start, end))
+    );
     const history = historyGroups.flat();
-    const collections = history.filter((item) => item.kind === 'collection');
-    const expenses = history.filter((item) => item.kind === 'expense');
-    const reportBalance = combined
-      ? summaries.reduce((total, summary) => total + (summary?.availableBalance ?? 0), 0)
-      : availableBalance;
-    return buildCashAccountingReport(collections, expenses, reportBalance, history, { excludeTransfers: combined });
-  }, [availableBalance, combined, reportRange, reportShopIds]);
+    return buildCashAccountingReport(history, { excludeTransfers: combined });
+  }, [combined, reportRange, reportShopIds]);
 
   useEffect(() => {
     let active = true;
@@ -117,7 +108,6 @@ export const AdminAccountingReport = ({ shopId, availableBalance }: { shopId: Sh
     };
   }, [loadReport, reloadToken]);
 
-  const visibleCategories = report?.expenseCategories.filter((category) => category.amount > 0) ?? [];
   const cashFlowAllocations = useMemo(
     () => report ? buildCashFlowAllocations(report) : [],
     [report]
@@ -135,206 +125,207 @@ export const AdminAccountingReport = ({ shopId, availableBalance }: { shopId: Sh
 
   return (
     <div className="accounting-report">
-      <div className="admin-report-period-tabs" role="group" aria-label="Report period">
-        <button type="button" className={period === 'month' ? 'selected' : ''} onClick={() => setPeriod('month')}>Month</button>
-        <button type="button" className={period === 'year' ? 'selected' : ''} onClick={() => setPeriod('year')}>Year</button>
-      </div>
-      <div className="admin-report-toolbar">
-        <label>
-          <CalendarDays size={18} />
-          <span>{period === 'month' ? 'Month' : 'Year'}</span>
-          {period === 'month' ? (
-            <input type="month" value={monthKey} max={currentMonthKey} onChange={(event) => setMonthKey(event.target.value)} />
-          ) : (
-            <select value={year} onChange={(event) => setYear(Number(event.target.value))}>
-              {yearOptions.map((option) => <option key={option} value={option}>{option}</option>)}
-            </select>
-          )}
-        </label>
-        <button className="icon-button" type="button" onClick={() => setReloadToken((current) => current + 1)} disabled={loading} title="Refresh report" aria-label="Refresh report">
-          <RefreshCw size={19} className={loading ? 'spin' : ''} />
+      <div className="report-controls">
+        <div className="admin-report-period-tabs" role="group" aria-label="Report period">
+          <button type="button" className={period === 'month' ? 'selected' : ''} onClick={() => setPeriod('month')}>Month</button>
+          <button type="button" className={period === 'year' ? 'selected' : ''} onClick={() => setPeriod('year')}>Year</button>
+        </div>
+        <div className="admin-report-toolbar">
+          <label>
+            <CalendarDays size={18} />
+            <span>{period === 'month' ? 'Month' : 'Year'}</span>
+            {period === 'month' ? (
+              <input type="month" value={monthKey} max={currentMonthKey} onChange={(event) => setMonthKey(event.target.value)} />
+            ) : (
+              <select value={year} onChange={(event) => setYear(Number(event.target.value))}>
+                {yearOptions.map((option) => <option key={option} value={option}>{option}</option>)}
+              </select>
+            )}
+          </label>
+          <button className="icon-button" type="button" onClick={() => setReloadToken((current) => current + 1)} disabled={loading} title="Refresh report" aria-label="Refresh report">
+            <RefreshCw size={19} className={loading ? 'spin' : ''} />
+          </button>
+        </div>
+
+        <button
+          className={`combined-report-button ${combined ? 'selected' : ''}`}
+          type="button"
+          aria-pressed={combined}
+          onClick={() => setCombined((current) => !current)}
+        >
+          <Combine size={19} /> Combined Report
         </button>
       </div>
 
-      <button
-        className={`combined-report-button ${combined ? 'selected' : ''}`}
-        type="button"
-        aria-pressed={combined}
-        onClick={() => setCombined((current) => !current)}
-      >
-        <Combine size={19} /> Combined Report
-      </button>
-
       <div className="admin-report-statement-tabs" role="group" aria-label="Accounting statement">
         <button type="button" className={statement === 'profit-loss' ? 'selected' : ''} onClick={() => setStatement('profit-loss')}>P&amp;L</button>
-        <button type="button" className={statement === 'cash-flow' ? 'selected' : ''} onClick={() => setStatement('cash-flow')}>CASH FLOW ANALYSIS</button>
+        <button type="button" className={statement === 'cash-flow' ? 'selected' : ''} onClick={() => setStatement('cash-flow')}>Cash Flow</button>
       </div>
 
       {error ? <div className="notice error" role="alert">{error}</div> : null}
       {loading ? <div className="accounting-loading">Loading accounting report...</div> : null}
 
       {!loading && report && statement === 'profit-loss' ? (
-        <>
-          <section className="accounting-section" aria-labelledby="cash-pl-title">
-            <div className="accounting-section-heading">
-              <div className="accounting-heading-icon"><TrendingUp size={21} /></div>
-              <div>
-                <h2 id="cash-pl-title">P&amp;L Statement</h2>
-                <span>{reportRange.label} / {combined ? 'ASHOKA + SMPA' : getShopName(shopId)}</span>
-              </div>
+        <section className="accounting-section" aria-labelledby="cash-pl-title">
+          <div className="accounting-section-heading">
+            <div className="accounting-heading-icon"><TrendingUp size={21} /></div>
+            <div>
+              <h2 id="cash-pl-title">P&amp;L Statement</h2>
+              <span>{reportRange.label} / {combined ? 'ASHOKA + SMPA' : getShopName(shopId)}</span>
             </div>
-            <div className="accounting-kpi-grid">
-              <div className="accounting-kpi income">
-                <TrendingUp size={19} />
-                <span>Collections</span>
-                <strong>{formatMoney(report.collections)}</strong>
-              </div>
-              <div className="accounting-kpi purchases">
-                <PackagePlus size={19} />
-                <span>Purchases (COGS)</span>
-                <strong>{formatMoney(report.purchases)}</strong>
-              </div>
-              <div className={`accounting-kpi gross ${report.grossProfit < 0 ? 'negative' : ''}`}>
-                <TrendingUp size={19} />
-                <span>Gross Profit</span>
-                <strong>{formatMoney(report.grossProfit)}</strong>
-              </div>
-              <div className="accounting-kpi expense">
-                <TrendingDown size={19} />
-                <span>Operating Expenses</span>
-                <strong>{formatMoney(report.operatingExpenses)}</strong>
-              </div>
-              <div className={`accounting-kpi net ${report.netCashResult < 0 ? 'negative' : ''}`}>
-                <Scale size={19} />
-                <span>Net Operating Result</span>
-                <strong>{formatMoney(report.netCashResult)}</strong>
-              </div>
-            </div>
-          </section>
-
-          <section className="accounting-section" aria-labelledby="expense-breakdown-title">
-            <div className="accounting-section-heading compact">
-              <div>
-                <h2 id="expense-breakdown-title">Expenses by Category</h2>
-                <span>{visibleCategories.reduce((total, category) => total + category.count, 0)} Entries</span>
-              </div>
-            </div>
-            {visibleCategories.length === 0 ? (
-              <div className="accounting-empty">No Operating Expenses Recorded for This Period.</div>
-            ) : (
-              <div className="expense-analysis-list">
-                {visibleCategories.map((category) => {
-                  const share = report.operatingExpenses > 0 ? Math.round((category.amount / report.operatingExpenses) * 100) : 0;
-                  return (
-                    <div className="expense-analysis-row" key={category.category}>
-                      <div className="expense-analysis-icon"><ExpenseCategoryIcon category={category.category} size={20} /></div>
-                      <div className="expense-analysis-copy">
-                        <div><strong>{category.label}</strong><span>{share}%</span></div>
-                        <div className="expense-share-track"><span style={{ width: `${share}%` }} /></div>
-                      </div>
-                      <strong className="expense-analysis-amount">{formatMoney(category.amount)}</strong>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </section>
-        </>
+          </div>
+          <div className="statement-table-shell">
+            <table className="financial-statement-table profit-loss-table" aria-label="Profit and loss statement">
+              <colgroup>
+                <col className="statement-description-column" />
+                <col className="statement-single-amount-column" />
+              </colgroup>
+              <thead>
+                <tr>
+                  <th scope="col">Particulars</th>
+                  <th scope="col" className="statement-amount">Amount</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr className="statement-group-row"><th colSpan={2}>Operating Performance</th></tr>
+                <tr>
+                  <td><span className="statement-marker inflow" />Collections</td>
+                  <td className="statement-amount inflow">{formatMoney(report.collections)}</td>
+                </tr>
+                <tr>
+                  <td><span className="statement-marker outflow" />Less: Purchases (COGS)</td>
+                  <td className="statement-amount outflow">{formatDeduction(report.purchases)}</td>
+                </tr>
+                <tr className={`statement-subtotal ${report.grossProfit < 0 ? 'negative' : ''}`}>
+                  <th scope="row">Gross Profit</th>
+                  <td className="statement-amount">{formatMoney(report.grossProfit)}</td>
+                </tr>
+                <tr>
+                  <td><span className="statement-marker outflow" />Less: Operating Expenses</td>
+                  <td className="statement-amount outflow">{formatDeduction(report.operatingExpenses)}</td>
+                </tr>
+                <tr className={`statement-result ${report.netCashResult < 0 ? 'negative' : ''}`}>
+                  <th scope="row">Net Operating Result</th>
+                  <td className="statement-amount">{formatMoney(report.netCashResult)}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
       ) : null}
 
       {!loading && report && statement === 'cash-flow' ? (
-        <>
-          <section className="accounting-section" aria-labelledby="cash-flow-title">
-            <div className="accounting-section-heading">
-              <div className="accounting-heading-icon cash-flow"><ArrowDownLeft size={21} /></div>
-              <div>
-                <h2 id="cash-flow-title">Cash Flow Analysis</h2>
-                <span>{reportRange.label} / {combined ? 'ASHOKA + SMPA' : getShopName(shopId)}</span>
-              </div>
+        <section className="accounting-section" aria-labelledby="cash-flow-title">
+          <div className="accounting-section-heading">
+            <div className="accounting-heading-icon cash-flow"><ArrowDownLeft size={21} /></div>
+            <div>
+              <h2 id="cash-flow-title">Cash Flow Statement</h2>
+              <span>{reportRange.label} / {combined ? 'ASHOKA + SMPA' : getShopName(shopId)}</span>
             </div>
+          </div>
 
-            <div className="accounting-kpi-grid">
-              <div className="accounting-kpi income">
-                <ArrowDownLeft size={19} />
-                <span>Cash Inflows</span>
-                <strong>{formatMoney(report.cashInflows)}</strong>
-              </div>
-              <div className="accounting-kpi expense">
-                <ArrowUpRight size={19} />
-                <span>Cash Outflows</span>
-                <strong>{formatMoney(report.cashOutflows)}</strong>
-              </div>
-              <div className={`accounting-kpi gross ${report.netCashFlow < 0 ? 'negative' : ''}`}>
-                <Scale size={19} />
-                <span>Net Cash Flow</span>
-                <strong>{formatMoney(report.netCashFlow)}</strong>
-              </div>
+          <div className="statement-table-shell">
+            <table className="financial-statement-table cash-flow-statement" aria-label="Cash inflow and outflow statement">
+              <colgroup>
+                <col className="statement-description-column" />
+                <col className="statement-flow-column" />
+                <col className="statement-flow-column" />
+              </colgroup>
+              <thead>
+                <tr>
+                  <th scope="col">Particulars</th>
+                  <th scope="col" className="statement-amount inflow"><span><ArrowDownLeft size={15} /> Cash In</span></th>
+                  <th scope="col" className="statement-amount outflow"><span><ArrowUpRight size={15} /> Cash Out</span></th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr className="statement-group-row"><th colSpan={3}>Operating Activities</th></tr>
+                <tr>
+                  <td>Collections</td>
+                  <td className="statement-amount inflow">{formatMoney(report.collections)}</td>
+                  <td className="statement-amount muted">-</td>
+                </tr>
+                <tr>
+                  <td>Purchases (COGS)</td>
+                  <td className="statement-amount muted">-</td>
+                  <td className="statement-amount outflow">{formatMoney(report.purchases)}</td>
+                </tr>
+                <tr>
+                  <td>Operating Expenses</td>
+                  <td className="statement-amount muted">-</td>
+                  <td className="statement-amount outflow">{formatMoney(report.operatingExpenses)}</td>
+                </tr>
+                <tr className="statement-group-row"><th colSpan={3}>Financing Activities</th></tr>
+                <tr>
+                  <td>EMI Payments</td>
+                  <td className="statement-amount muted">-</td>
+                  <td className="statement-amount outflow">{formatMoney(report.emiPayments)}</td>
+                </tr>
+                {!combined ? (
+                  <>
+                    <tr className="statement-group-row"><th colSpan={3}>Branch Transfers</th></tr>
+                    <tr>
+                      <td>Transfers</td>
+                      <td className="statement-amount inflow">{formatMoney(report.transfersIn)}</td>
+                      <td className="statement-amount outflow">{formatMoney(report.transfersOut)}</td>
+                    </tr>
+                  </>
+                ) : null}
+                <tr className="statement-group-row"><th colSpan={3}>Administrative Adjustments</th></tr>
+                <tr>
+                  <td>Manual Adjustments</td>
+                  <td className="statement-amount inflow">{formatMoney(report.adjustmentsIn)}</td>
+                  <td className="statement-amount outflow">{formatMoney(report.adjustmentsOut)}</td>
+                </tr>
+                <tr className="statement-total">
+                  <th scope="row">Total Cash Flow</th>
+                  <td className="statement-amount inflow">{formatMoney(report.cashInflows)}</td>
+                  <td className="statement-amount outflow">{formatMoney(report.cashOutflows)}</td>
+                </tr>
+                <tr className={`statement-result ${report.netCashFlow < 0 ? 'negative' : ''}`}>
+                  <th scope="row">Net Cash Flow</th>
+                  <td className="statement-amount" colSpan={2}>{formatMoney(report.netCashFlow)}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div className="report-subsection-heading">
+            <div>
+              <h3>Outflow Allocation</h3>
+              <span>Spending by accounting category</span>
             </div>
+            <strong>{cashFlowAllocations.length}</strong>
+          </div>
 
-            {cashFlowAllocations.length > 0 ? (
-              <div className="cash-flow-allocation-analysis">
-                <div className="cash-flow-donut-wrap">
-                  <div className="cash-flow-donut" style={{ background: cashFlowGradient }}>
-                    <div className="cash-flow-donut-center">
-                      <span>Cash Outflows</span>
-                      <strong>{formatMoney(report.cashOutflows)}</strong>
-                      <small>From {formatMoney(report.collections)} Collections</small>
-                    </div>
+          {cashFlowAllocations.length > 0 ? (
+            <div className="cash-flow-allocation-analysis">
+              <div className="cash-flow-donut-wrap">
+                <div className="cash-flow-donut" style={{ background: cashFlowGradient }}>
+                  <div className="cash-flow-donut-center">
+                    <span>Total Outflow</span>
+                    <strong>{formatMoney(report.cashOutflows)}</strong>
+                    <small>{report.collections > 0 ? `${Math.round((report.cashOutflows / report.collections) * 100)}% of collections` : 'No collections'}</small>
                   </div>
                 </div>
-                <div className="cash-flow-allocation-list">
-                  {cashFlowAllocations.map((allocation) => (
-                    <div className="cash-flow-allocation-row" key={allocation.key}>
-                      <span className="cash-flow-swatch" style={{ background: CASH_FLOW_COLORS[allocation.key] ?? '#94a3b8' }} />
-                      <div>
-                        <strong>{allocation.label}</strong>
-                        <span>{allocation.shareOfOutflows}% of Spending | {allocation.shareOfCollections}% of Collections</span>
-                      </div>
-                      <strong>{formatMoney(allocation.amount)}</strong>
+              </div>
+              <div className="cash-flow-allocation-list">
+                {cashFlowAllocations.map((allocation) => (
+                  <div className="cash-flow-allocation-row" key={allocation.key}>
+                    <span className="cash-flow-swatch" style={{ background: CASH_FLOW_COLORS[allocation.key] ?? '#94a3b8' }} />
+                    <div>
+                      <strong>{allocation.label}</strong>
+                      <span>{allocation.shareOfOutflows}% of Spending | {allocation.shareOfCollections}% of Collections</span>
                     </div>
-                  ))}
-                </div>
-              </div>
-            ) : (
-              <div className="accounting-empty">No Cash Outflows Recorded for This Period.</div>
-            )}
-
-            <div className="cash-flow-groups">
-              <div className="cash-flow-group inflow">
-                <h3><ArrowDownLeft size={18} /> Cash Inflows</h3>
-                <div><span>Collections</span><strong>{formatMoney(report.collections)}</strong></div>
-                <div><span>Transfers In</span><strong>{formatMoney(report.transfersIn)}</strong></div>
-                <div><span>Admin Additions</span><strong>{formatMoney(report.adjustmentsIn)}</strong></div>
-                <div className="total"><span>Total Cash Inflows</span><strong>{formatMoney(report.cashInflows)}</strong></div>
-              </div>
-              <div className="cash-flow-group outflow">
-                <h3><ArrowUpRight size={18} /> Cash Outflows</h3>
-                <div><span>Purchases (COGS)</span><strong>{formatMoney(report.purchases)}</strong></div>
-                <div><span>Operating Expenses</span><strong>{formatMoney(report.operatingExpenses)}</strong></div>
-                <div className="emi-row"><span>EMI Payments</span><strong>{formatMoney(report.emiPayments)}</strong></div>
-                <div><span>Transfers Out</span><strong>{formatMoney(report.transfersOut)}</strong></div>
-                <div><span>Admin Deductions</span><strong>{formatMoney(report.adjustmentsOut)}</strong></div>
-                <div className="total"><span>Total Cash Outflows</span><strong>{formatMoney(report.cashOutflows)}</strong></div>
+                    <strong>{formatMoney(allocation.amount)}</strong>
+                  </div>
+                ))}
               </div>
             </div>
-
-          </section>
-
-          <section className="accounting-section" aria-labelledby="cash-position-title">
-            <div className="accounting-section-heading">
-              <div className="accounting-heading-icon balance"><WalletCards size={21} /></div>
-              <div>
-                <h2 id="cash-position-title">Current Cash Position</h2>
-                <span>{combined ? 'ASHOKA + SMPA' : getShopName(shopId)}</span>
-              </div>
-            </div>
-            <div className="balance-sheet-rows">
-              <div><span>Cash Asset</span><strong>{formatMoney(report.cashAsset)}</strong></div>
-              <div><span>Cash Deficit</span><strong className={report.cashDeficit > 0 ? 'negative' : ''}>{formatMoney(report.cashDeficit)}</strong></div>
-              <div className="total"><span>Net Cash Position</span><strong className={report.netCashPosition < 0 ? 'negative' : ''}>{formatMoney(report.netCashPosition)}</strong></div>
-            </div>
-          </section>
-        </>
+          ) : (
+            <div className="accounting-empty">No Cash Outflows Recorded for This Period.</div>
+          )}
+        </section>
       ) : null}
     </div>
   );

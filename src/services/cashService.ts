@@ -80,7 +80,7 @@ const mapTransferRecord = (id: string, data: DocumentData): ShopTransferRecord |
 };
 
 export const createExpenseId = () => doc(collection(db, CASH_EXPENSES)).id;
-export const createExpenseCorrectionId = () => doc(collection(db, CASH_EXPENSE_CORRECTIONS)).id;
+const createExpenseCorrectionId = () => doc(collection(db, CASH_EXPENSE_CORRECTIONS)).id;
 export const createTransferId = () => doc(collection(db, SHOP_TRANSFERS)).id;
 export const createAdjustmentId = () => doc(collection(db, CASH_ADJUSTMENTS)).id;
 

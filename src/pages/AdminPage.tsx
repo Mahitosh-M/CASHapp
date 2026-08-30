@@ -209,7 +209,7 @@ export const AdminPage = () => {
         </form>
       </div> : currentShopId ? (
         <div role="tabpanel">
-          <AdminAccountingReport shopId={currentShopId} availableBalance={summary?.availableBalance ?? 0} />
+          <AdminAccountingReport shopId={currentShopId} />
         </div>
       ) : null}
 

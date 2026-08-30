@@ -16,12 +16,12 @@ export const EXPENSE_CATEGORIES: ExpenseCategoryOption[] = [
   { id: 'other', label: 'Other' }
 ];
 
-export const PURCHASE_CATEGORY: ExpenseCategoryOption = { id: 'purchases', label: 'Purchases' };
-export const EMI_CATEGORY: ExpenseCategoryOption = { id: 'emi', label: 'EMI' };
+const PURCHASE_CATEGORY: ExpenseCategoryOption = { id: 'purchases', label: 'Purchases' };
+const EMI_CATEGORY: ExpenseCategoryOption = { id: 'emi', label: 'EMI' };
 
 export const CASH_OUTFLOW_CATEGORIES = [PURCHASE_CATEGORY, EMI_CATEGORY, ...EXPENSE_CATEGORIES];
 
-export const isExpenseCategory = (value: unknown): value is ExpenseCategory => (
+const isExpenseCategory = (value: unknown): value is ExpenseCategory => (
   typeof value === 'string' && CASH_OUTFLOW_CATEGORIES.some((category) => category.id === value)
 );
 
