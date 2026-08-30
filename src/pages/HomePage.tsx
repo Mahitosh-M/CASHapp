@@ -1,8 +1,10 @@
 import {
   ArrowDownLeft,
   ArrowUpRight,
+  CreditCard,
   IndianRupee,
   Landmark,
+  PackagePlus,
   ReceiptIndianRupee,
   ReceiptText,
   TrendingDown
@@ -142,11 +144,19 @@ export const HomePage = () => {
       <section className="home-actions" aria-label="Cash actions">
         <button className="quick-action-tile expense-action" type="button" onClick={() => navigate('/expense')} disabled={!canUseBalance}>
           <span className="quick-action-icon" aria-hidden="true"><ReceiptIndianRupee size={29} /></span>
-          <span>Add expense</span>
+          <span>Add Expense</span>
         </button>
         <button className="quick-action-tile transfer-action" type="button" onClick={() => navigate('/transfer')} disabled={!canUseBalance}>
           <span className="quick-action-icon" aria-hidden="true"><CashFlowArrows size={24} /></span>
-          <span>Transfer money</span>
+          <span>Transfer Money</span>
+        </button>
+        <button className="quick-action-tile purchase-action" type="button" onClick={() => navigate('/purchase')} disabled={!canUseBalance}>
+          <span className="quick-action-icon" aria-hidden="true"><PackagePlus size={28} /></span>
+          <span>Purchases</span>
+        </button>
+        <button className="quick-action-tile emi-action" type="button" onClick={() => navigate('/emi')} disabled={!canUseBalance}>
+          <span className="quick-action-icon" aria-hidden="true"><CreditCard size={28} /></span>
+          <span>EMI</span>
         </button>
       </section>
 
@@ -192,12 +202,12 @@ export const HomePage = () => {
         </button>
         <button className="summary-item incoming-tone" type="button" onClick={() => navigate('/history/transfers-in')}>
           <ArrowDownLeft size={20} />
-          <span>Transferred in</span>
+          <span>Transferred In</span>
           <strong>{formatMoney(summary?.totalTransferredIn ?? 0)}</strong>
         </button>
         <button className="summary-item outgoing-tone" type="button" onClick={() => navigate('/history/transfers-out')}>
           <ArrowUpRight size={20} />
-          <span>Transferred out</span>
+          <span>Transferred Out</span>
           <strong>{formatMoney(summary?.totalTransferredOut ?? 0)}</strong>
         </button>
       </section>

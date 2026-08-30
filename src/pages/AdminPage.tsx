@@ -1,6 +1,7 @@
 import { ChartNoAxesCombined, CircleMinus, CirclePlus, IndianRupee, SlidersHorizontal } from 'lucide-react';
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
+import { AutoGrowTextarea } from '../components/AutoGrowTextarea';
 import { PageHeader } from '../components/PageHeader';
 import { AdminAccountingReport } from '../components/AdminAccountingReport';
 import { WholeRupeeInput } from '../components/WholeRupeeInput';
@@ -185,14 +186,13 @@ export const AdminPage = () => {
 
         <label>
           Reason
-          <textarea
+          <AutoGrowTextarea
             value={reason}
             onChange={(event) => {
               setReason(event.target.value);
               resetOperationId();
             }}
             maxLength={MAX_DESCRIPTION_LENGTH}
-            rows={4}
             placeholder="Example: Opening transaction correction"
             disabled={submitting}
           />

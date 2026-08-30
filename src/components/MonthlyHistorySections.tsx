@@ -25,6 +25,7 @@ interface MonthlyHistorySectionsProps {
   loadMonth: (start: Date, end: Date) => Promise<CashHistoryItem[]>;
   loadPreviousDates: (before: Date) => Promise<Date[]>;
   onEditTransfer?: (transferId: string) => void;
+  onEditExpense?: (expenseId: string) => void;
 }
 
 const emptyMonth: LoadedMonth = {
@@ -39,7 +40,8 @@ export const MonthlyHistorySections = ({
   emptyText,
   loadMonth,
   loadPreviousDates,
-  onEditTransfer
+  onEditTransfer,
+  onEditExpense
 }: MonthlyHistorySectionsProps) => {
   const currentMonth = useMemo(() => getHistoryMonth(new Date()), []);
   const [currentItems, setCurrentItems] = useState<CashHistoryItem[]>([]);
@@ -145,7 +147,7 @@ export const MonthlyHistorySections = ({
           {getHistoryMonthLabel(currentMonth)}
         </h2>
         {currentItems.length > 0
-          ? <CashHistoryList items={currentItems} onEditTransfer={onEditTransfer} />
+          ? <CashHistoryList items={currentItems} onEditTransfer={onEditTransfer} onEditExpense={onEditExpense} />
           : <div className="history-month-empty">No entries this month.</div>}
       </section>
 
@@ -180,7 +182,7 @@ export const MonthlyHistorySections = ({
                     ? <div className="history-month-empty">No entries for this month.</div>
                     : null}
                   {monthState.items.length > 0
-                    ? <CashHistoryList items={monthState.items} onEditTransfer={onEditTransfer} />
+                    ? <CashHistoryList items={monthState.items} onEditTransfer={onEditTransfer} onEditExpense={onEditExpense} />
                     : null}
                 </div>
               ) : null}

@@ -1,6 +1,7 @@
 import { IndianRupee } from 'lucide-react';
 import { useRef, useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { AutoGrowTextarea } from '../components/AutoGrowTextarea';
 import { CashFlowArrows } from '../components/CashFlowArrows';
 import { PageHeader } from '../components/PageHeader';
 import { WholeRupeeInput } from '../components/WholeRupeeInput';
@@ -124,14 +125,13 @@ export const TransferPage = () => {
 
         <label>
           Note <span className="optional-label">Optional</span>
-          <textarea
+          <AutoGrowTextarea
             value={note}
             onChange={(event) => {
               setNote(event.target.value);
               resetOperationId();
             }}
             maxLength={MAX_DESCRIPTION_LENGTH}
-            rows={3}
             placeholder="Example: Cash sent with delivery vehicle"
             disabled={submitting}
           />

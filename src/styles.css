@@ -753,8 +753,9 @@ button:disabled {
 
 .cash-form textarea {
   width: 100%;
-  min-height: 104px;
-  resize: vertical;
+  min-height: 70px;
+  overflow-y: hidden;
+  resize: none;
   padding: 13px 14px;
   color: var(--ink);
   background: #fbfbfe;
@@ -1333,6 +1334,47 @@ button:disabled {
   border-color: rgba(91, 211, 181, 0.3);
 }
 
+.cash-form select {
+  width: 100%;
+  min-height: 52px;
+  padding: 0 13px;
+  color: var(--ink);
+  background: #fbfbfe;
+  border: 1px solid #cfd2e3;
+  border-radius: 8px;
+  outline: 0;
+  font: inherit;
+  font-weight: 750;
+}
+
+.cash-form select:focus {
+  background: #ffffff;
+  border-color: var(--gold);
+  box-shadow: 0 0 0 4px rgba(212, 175, 55, 0.16);
+}
+
+.quick-action-tile.purchase-action {
+  background: linear-gradient(145deg, #185142, #343268);
+  border-color: rgba(112, 242, 173, 0.34);
+}
+
+.purchase-action .quick-action-icon {
+  color: #70f2ad;
+  background: rgba(112, 242, 173, 0.12);
+  border-color: rgba(112, 242, 173, 0.34);
+}
+
+.quick-action-tile.emi-action {
+  background: linear-gradient(145deg, #53304f, #283563);
+  border-color: rgba(216, 162, 220, 0.36);
+}
+
+.emi-action .quick-action-icon {
+  color: #f0bff2;
+  background: rgba(216, 162, 220, 0.12);
+  border-color: rgba(216, 162, 220, 0.34);
+}
+
 .transfer-action .quick-action-icon {
   background: linear-gradient(135deg, rgba(255, 102, 127, 0.13), rgba(69, 229, 162, 0.13));
   border-color: rgba(91, 211, 181, 0.34);
@@ -1352,6 +1394,12 @@ button:disabled {
 
 .quick-action-tile svg {
   transition: transform 180ms ease;
+}
+
+.quick-action-tile > span:last-child,
+.summary-item > span,
+.expense-category-grid button span {
+  text-transform: capitalize;
 }
 
 .cash-flow-arrows {
@@ -1456,6 +1504,41 @@ button:disabled {
   gap: 20px;
 }
 
+.admin-report-period-tabs,
+.admin-report-statement-tabs {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 4px;
+  padding: 4px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(212, 175, 55, 0.25);
+  border-radius: 8px;
+}
+
+.admin-report-period-tabs button,
+.admin-report-statement-tabs button {
+  min-height: 38px;
+  color: #cbd5e1;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 850;
+}
+
+.admin-report-period-tabs button.selected,
+.admin-report-statement-tabs button.selected {
+  color: #11185a;
+  background: #fde68a;
+  border-color: #d4af37;
+}
+
+.admin-report-statement-tabs button {
+  font-size: 0.72rem;
+}
+
 .admin-report-toolbar {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 44px;
@@ -1483,7 +1566,8 @@ button:disabled {
   color: #fde68a;
 }
 
-.admin-report-toolbar input {
+.admin-report-toolbar input,
+.admin-report-toolbar select {
   min-width: 0;
   width: 100%;
   padding: 6px;
@@ -1574,6 +1658,11 @@ button:disabled {
   background: #fde68a;
 }
 
+.accounting-heading-icon.cash-flow {
+  color: #11185a;
+  background: #8ed8ff;
+}
+
 .accounting-kpi-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1618,9 +1707,24 @@ button:disabled {
   border-color: #ff8294;
 }
 
-.accounting-kpi.net {
+.accounting-kpi.purchases {
+  background: #4d294f;
+  border-color: #d8a2dc;
+}
+
+.accounting-kpi.gross {
   grid-column: 1 / -1;
   min-height: 88px;
+  background: #07513d;
+  border-color: #70f2ad;
+}
+
+.accounting-kpi.gross.negative {
+  background: #6c2635;
+  border-color: #ff8294;
+}
+
+.accounting-kpi.net {
   background: #173f68;
   border-color: #63b3ed;
 }
@@ -1697,6 +1801,178 @@ button:disabled {
   height: 100%;
   background: #facc15;
   border-radius: inherit;
+}
+
+.cash-flow-allocation-analysis {
+  display: grid;
+  gap: 16px;
+  margin-top: 14px;
+}
+
+.cash-flow-donut-wrap {
+  display: grid;
+  place-items: center;
+}
+
+.cash-flow-donut {
+  display: grid;
+  width: min(244px, 72vw);
+  aspect-ratio: 1;
+  place-items: center;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 50%;
+  box-shadow: 0 16px 34px rgba(4, 7, 28, 0.28);
+}
+
+.cash-flow-donut-center {
+  display: grid;
+  width: 64%;
+  aspect-ratio: 1;
+  padding: 12px;
+  place-content: center;
+  color: #ffffff;
+  background: #161b3f;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 50%;
+  text-align: center;
+}
+
+.cash-flow-donut-center span,
+.cash-flow-donut-center small {
+  color: #aeb9cb;
+  font-size: 0.66rem;
+  font-weight: 750;
+}
+
+.cash-flow-donut-center strong {
+  margin: 5px 0;
+  font-size: 1.15rem;
+  overflow-wrap: anywhere;
+}
+
+.cash-flow-allocation-list {
+  display: grid;
+  gap: 7px;
+}
+
+.cash-flow-allocation-row {
+  display: grid;
+  grid-template-columns: 12px minmax(0, 1fr) auto;
+  min-width: 0;
+  align-items: center;
+  gap: 9px;
+  padding: 9px 10px;
+  background: rgba(255, 255, 255, 0.055);
+  border: 1px solid rgba(255, 255, 255, 0.11);
+  border-radius: 7px;
+}
+
+.cash-flow-swatch {
+  width: 12px;
+  height: 28px;
+  border-radius: 3px;
+}
+
+.cash-flow-allocation-row > div {
+  min-width: 0;
+}
+
+.cash-flow-allocation-row > div strong,
+.cash-flow-allocation-row > div span {
+  display: block;
+  overflow-wrap: anywhere;
+}
+
+.cash-flow-allocation-row > div strong {
+  color: #ffffff;
+  font-size: 0.76rem;
+}
+
+.cash-flow-allocation-row > div span {
+  margin-top: 3px;
+  color: #aeb9cb;
+  font-size: 0.64rem;
+  font-weight: 750;
+}
+
+.cash-flow-allocation-row > strong {
+  max-width: 94px;
+  color: #ffffff;
+  font-size: 0.77rem;
+  overflow-wrap: anywhere;
+  text-align: right;
+}
+
+.cash-flow-groups {
+  display: grid;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.cash-flow-group {
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.13);
+  border-radius: 8px;
+}
+
+.cash-flow-group h3 {
+  display: flex;
+  min-height: 44px;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  padding: 10px 12px;
+  color: #ffffff;
+  font-size: 0.82rem;
+}
+
+.cash-flow-group.inflow h3 {
+  color: #8ff3bf;
+  background: rgba(7, 81, 61, 0.7);
+}
+
+.cash-flow-group.outflow h3 {
+  color: #ffb3bf;
+  background: rgba(87, 32, 42, 0.72);
+}
+
+.cash-flow-group > div {
+  display: flex;
+  min-height: 42px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 9px 12px;
+  border-top: 1px solid rgba(255, 255, 255, 0.09);
+}
+
+.cash-flow-group span {
+  color: #cbd5e1;
+  font-size: 0.75rem;
+  font-weight: 750;
+}
+
+.cash-flow-group strong {
+  color: #ffffff;
+  font-size: 0.8rem;
+  overflow-wrap: anywhere;
+  text-align: right;
+}
+
+.cash-flow-group .emi-row span,
+.cash-flow-group .emi-row strong {
+  color: #f0bff2;
+}
+
+.cash-flow-group .total {
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.cash-flow-group .total span,
+.cash-flow-group .total strong {
+  color: #fde68a;
+  font-weight: 900;
 }
 
 .expense-analysis-amount {

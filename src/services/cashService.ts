@@ -21,6 +21,8 @@ import type {
   CashAdjustmentInput,
   CashInitializationInput,
   CashExpenseInput,
+  CashExpenseRecord,
+  CashExpenseUpdateInput,
   CashHistoryCategory,
   CashHistoryItem,
   ShopCashSummary,
@@ -35,6 +37,7 @@ import { getShopName, isShopId } from '../utils/shops';
 
 const SHOP_CASH = 'shopCash';
 const CASH_EXPENSES = 'cashExpenses';
+const CASH_EXPENSE_CORRECTIONS = 'cashExpenseCorrections';
 const SHOP_TRANSFERS = 'shopTransfers';
 const CASH_ADJUSTMENTS = 'cashAdjustments';
 const CASH_INITIALIZATIONS = 'cashInitializations';
@@ -77,6 +80,7 @@ const mapTransferRecord = (id: string, data: DocumentData): ShopTransferRecord |
 };
 
 export const createExpenseId = () => doc(collection(db, CASH_EXPENSES)).id;
+export const createExpenseCorrectionId = () => doc(collection(db, CASH_EXPENSE_CORRECTIONS)).id;
 export const createTransferId = () => doc(collection(db, SHOP_TRANSFERS)).id;
 export const createAdjustmentId = () => doc(collection(db, CASH_ADJUSTMENTS)).id;
 
@@ -146,6 +150,124 @@ export const createExpense = async (input: CashExpenseInput) => {
   });
   await batch.commit();
 };
+
+const mapExpenseRecord = (id: string, data: DocumentData): CashExpenseRecord | null => {
+  const amount = numberOrZero(data.amount);
+  if (!isShopId(data.shopId) || amount <= 0) return null;
+  return {
+    id,
+    shopId: data.shopId,
+    amount,
+    category: normalizeExpenseCategory(data.category),
+    description: String(data.description || ''),
+    createdBy: String(data.createdBy || ''),
+    createdAt: historyDateOrNull(data.createdAt),
+    updatedAt: historyDateOrNull(data.updatedAt),
+    updatedBy: typeof data.updatedBy === 'string' ? data.updatedBy : undefined
+  };
+};
+
+export const getExpense = async (expenseId: string): Promise<CashExpenseRecord | null> => {
+  const expenseSnapshot = await getDoc(doc(db, CASH_EXPENSES, expenseId));
+  return expenseSnapshot.exists()
+    ? mapExpenseRecord(expenseSnapshot.id, expenseSnapshot.data())
+    : null;
+};
+
+export const updateExpense = async (input: CashExpenseUpdateInput) => runTransaction(db, async (transaction) => {
+  const expenseRef = doc(db, CASH_EXPENSES, input.id);
+  const expenseSnapshot = await transaction.get(expenseRef);
+  const existing = expenseSnapshot.exists()
+    ? mapExpenseRecord(expenseSnapshot.id, expenseSnapshot.data())
+    : null;
+  if (!existing) throw new Error('Cash outflow entry was not found.');
+
+  const summaryRef = doc(db, SHOP_CASH, existing.shopId);
+  const summarySnapshot = await transaction.get(summaryRef);
+  if (!summarySnapshot.exists() || !summarySnapshot.data().initializedAt) {
+    throw new Error('The shop balance is not initialized.');
+  }
+
+  const summary = summarySnapshot.data();
+  const amountDifference = input.amount - existing.amount;
+  if (numberOrZero(summary.totalExpenses) + amountDifference < 0) {
+    throw new Error('Expense totals are inconsistent. The entry was not updated.');
+  }
+
+  const correctionId = createExpenseCorrectionId();
+  transaction.set(doc(db, CASH_EXPENSE_CORRECTIONS, correctionId), {
+    expenseId: existing.id,
+    shopId: existing.shopId,
+    action: 'edit',
+    previousAmount: existing.amount,
+    previousCategory: existing.category,
+    previousDescription: existing.description,
+    nextAmount: input.amount,
+    nextCategory: input.category,
+    nextDescription: input.description.trim(),
+    createdAt: serverTimestamp(),
+    createdBy: input.updatedBy
+  });
+  transaction.update(expenseRef, {
+    amount: input.amount,
+    category: input.category,
+    description: input.description.trim(),
+    updatedAt: serverTimestamp(),
+    updatedBy: input.updatedBy
+  });
+  transaction.update(summaryRef, {
+    availableBalance: increment(-amountDifference),
+    totalExpenses: increment(amountDifference),
+    lastCashOperationId: correctionId,
+    lastCashOperationType: 'expense_edit',
+    updatedAt: new Date().toISOString()
+  });
+
+  return { previousAmount: existing.amount, amount: input.amount, shopId: existing.shopId };
+});
+
+export const deleteExpense = async (expenseId: string, deletedBy: string) => runTransaction(db, async (transaction) => {
+  const expenseRef = doc(db, CASH_EXPENSES, expenseId);
+  const expenseSnapshot = await transaction.get(expenseRef);
+  const existing = expenseSnapshot.exists()
+    ? mapExpenseRecord(expenseSnapshot.id, expenseSnapshot.data())
+    : null;
+  if (!existing) throw new Error('Cash outflow entry was not found.');
+
+  const summaryRef = doc(db, SHOP_CASH, existing.shopId);
+  const summarySnapshot = await transaction.get(summaryRef);
+  if (!summarySnapshot.exists() || !summarySnapshot.data().initializedAt) {
+    throw new Error('The shop balance is not initialized.');
+  }
+  if (numberOrZero(summarySnapshot.data().totalExpenses) < existing.amount) {
+    throw new Error('Expense totals are inconsistent. The entry was not deleted.');
+  }
+
+  const correctionId = createExpenseCorrectionId();
+  transaction.set(doc(db, CASH_EXPENSE_CORRECTIONS, correctionId), {
+    expenseId: existing.id,
+    shopId: existing.shopId,
+    action: 'delete',
+    previousAmount: existing.amount,
+    previousCategory: existing.category,
+    previousDescription: existing.description,
+    nextAmount: 0,
+    nextCategory: existing.category,
+    nextDescription: existing.description,
+    createdAt: serverTimestamp(),
+    createdBy: deletedBy
+  });
+  transaction.update(summaryRef, {
+    availableBalance: increment(existing.amount),
+    totalExpenses: increment(-existing.amount),
+    lastCashOperationId: correctionId,
+    lastCashOperationType: 'expense_delete',
+    updatedAt: new Date().toISOString()
+  });
+  transaction.delete(expenseRef);
+
+  return existing;
+});
 
 export const createTransfer = async (input: ShopTransferInput) => {
   const batch = writeBatch(db);
@@ -507,7 +629,7 @@ export const getCashPreviousHistoryDates = async (
 
 export const getFriendlyCashError = (
   error: unknown,
-  action: 'load' | 'initialize' | 'expense' | 'transfer' | 'transfer-delete' | 'adjustment' | 'history'
+  action: 'load' | 'initialize' | 'expense' | 'expense-edit' | 'expense-delete' | 'purchase' | 'emi' | 'transfer' | 'transfer-delete' | 'adjustment' | 'history'
 ) => {
   console.error(`Cash App ${action} error`, error);
   const code = typeof error === 'object' && error !== null && 'code' in error
@@ -519,6 +641,10 @@ export const getFriendlyCashError = (
   if (code === 'failed-precondition' && action === 'history') return 'History is not ready yet. Please contact Admin.';
   if (action === 'initialize') return 'Branch cash could not be initialized. Please try again.';
   if (action === 'expense') return 'Expense could not be saved. Please try again.';
+  if (action === 'expense-edit') return 'Cash outflow could not be updated. Please try again.';
+  if (action === 'expense-delete') return 'Cash outflow could not be deleted. Please try again.';
+  if (action === 'purchase') return 'Purchase could not be saved. Please try again.';
+  if (action === 'emi') return 'EMI payment could not be saved. Please try again.';
   if (action === 'transfer') return 'Transfer was not completed. No amount was moved.';
   if (action === 'transfer-delete') return 'Transfer was not deleted. No balances were changed.';
   if (action === 'adjustment') return 'The available amount was not adjusted. Please try again.';

@@ -1,6 +1,7 @@
 import { ArrowDownLeft, ArrowUpRight, CircleMinus, CirclePlus, IndianRupee, Pencil, ReceiptText } from 'lucide-react';
 import type { CashHistoryItem } from '../types';
 import { formatMoney } from '../utils/cash';
+import { getExpenseCategoryLabel } from '../utils/expenseCategories';
 import { ExpenseCategoryIcon } from './ExpenseCategoryIcon';
 
 const getActivityDate = (item: CashHistoryItem) => {
@@ -33,10 +34,12 @@ const ActivityIcon = ({ item }: { item: CashHistoryItem }) => {
 
 export const CashHistoryList = ({
   items,
-  onEditTransfer
+  onEditTransfer,
+  onEditExpense
 }: {
   items: CashHistoryItem[];
   onEditTransfer?: (transferId: string) => void;
+  onEditExpense?: (expenseId: string) => void;
 }) => (
   <div className="history-list">
     {items.map((item) => {
@@ -58,6 +61,17 @@ export const CashHistoryList = ({
                 onClick={() => onEditTransfer(item.id)}
                 title="Edit transfer"
                 aria-label={`Edit transfer of ${formatMoney(item.amount)}`}
+              >
+                <Pencil size={17} />
+              </button>
+            ) : null}
+            {item.kind === 'expense' && onEditExpense ? (
+              <button
+                className="icon-button history-edit-button"
+                type="button"
+                onClick={() => onEditExpense(item.id)}
+                title="Correct cash entry"
+                aria-label={`Correct ${getExpenseCategoryLabel(item.expenseCategory ?? 'other')} entry of ${formatMoney(item.amount)}`}
               >
                 <Pencil size={17} />
               </button>

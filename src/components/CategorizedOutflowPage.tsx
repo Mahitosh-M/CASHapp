@@ -1,10 +1,6 @@
 import { IndianRupee, Save } from 'lucide-react';
 import { useRef, useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { AutoGrowTextarea } from '../components/AutoGrowTextarea';
-import { PageHeader } from '../components/PageHeader';
-import { ExpenseCategoryIcon } from '../components/ExpenseCategoryIcon';
-import { WholeRupeeInput } from '../components/WholeRupeeInput';
 import { useAuth } from '../context/AuthContext';
 import { useCash } from '../context/CashContext';
 import { useOnlineStatus } from '../hooks/useOnlineStatus';
@@ -18,19 +14,33 @@ import {
   parseMoneyInput,
   validateDescription
 } from '../utils/cash';
-import {
-  EXPENSE_CATEGORIES,
-  getExpenseDescriptionForCategory,
-  resolveExpenseDetails
-} from '../utils/expenseCategories';
+import { getExpenseCategoryLabel } from '../utils/expenseCategories';
+import { AutoGrowTextarea } from './AutoGrowTextarea';
+import { PageHeader } from './PageHeader';
+import { WholeRupeeInput } from './WholeRupeeInput';
 
-export const ExpensePage = () => {
+interface CategorizedOutflowPageProps {
+  category: Extract<ExpenseCategory, 'purchases' | 'emi'>;
+  title: string;
+  fieldLabel: string;
+  placeholder: string;
+  savedNotice: string;
+  submitLabel: string;
+}
+
+export const CategorizedOutflowPage = ({
+  category,
+  title,
+  fieldLabel,
+  placeholder,
+  savedNotice,
+  submitLabel
+}: CategorizedOutflowPageProps) => {
   const { currentShopId, firebaseUser } = useAuth();
   const { summary, applyExpenseLocally } = useCash();
   const online = useOnlineStatus();
   const navigate = useNavigate();
   const operationId = useRef<string | null>(null);
-  const [category, setCategory] = useState<ExpenseCategory | ''>('');
   const [amountText, setAmountText] = useState('');
   const [description, setDescription] = useState('');
   const [error, setError] = useState('');
@@ -44,7 +54,7 @@ export const ExpensePage = () => {
     event.preventDefault();
     if (submitting) return;
     if (!online) {
-      setError('Connect to the internet before saving an expense.');
+      setError(`Connect to the internet before saving ${category === 'emi' ? 'an EMI payment' : 'a purchase'}.`);
       return;
     }
     if (!summary || !isShopCashInitialized(summary) || !currentShopId || !firebaseUser) {
@@ -57,8 +67,9 @@ export const ExpensePage = () => {
       setError('Enter a whole rupee amount greater than zero.');
       return;
     }
-    const expenseDetails = resolveExpenseDetails(category, description);
-    const descriptionError = validateDescription(expenseDetails.description);
+
+    const resolvedDescription = description.trim() || getExpenseCategoryLabel(category);
+    const descriptionError = validateDescription(resolvedDescription);
     if (descriptionError) {
       setError(descriptionError);
       return;
@@ -72,15 +83,15 @@ export const ExpensePage = () => {
         id: operationId.current,
         shopId: currentShopId,
         amount,
-        category: expenseDetails.category,
-        description: expenseDetails.description,
+        category,
+        description: resolvedDescription,
         createdBy: firebaseUser.uid
       });
       applyExpenseLocally(amount);
       operationId.current = null;
-      navigate('/', { replace: true, state: { notice: 'Expense added successfully.' } });
+      navigate('/', { replace: true, state: { notice: savedNotice } });
     } catch (saveError) {
-      setError(getFriendlyCashError(saveError, 'expense'));
+      setError(getFriendlyCashError(saveError, category === 'emi' ? 'emi' : 'purchase'));
     } finally {
       setSubmitting(false);
     }
@@ -88,7 +99,7 @@ export const ExpensePage = () => {
 
   return (
     <div className="page form-page">
-      <PageHeader title="Add expense" subtitle={`Available ${formatMoney(summary?.availableBalance ?? 0)}`} />
+      <PageHeader title={title} subtitle={`Available ${formatMoney(summary?.availableBalance ?? 0)}`} />
       {error ? <div className="notice error" role="alert">{error}</div> : null}
 
       <form className="cash-form" onSubmit={handleSubmit}>
@@ -109,7 +120,7 @@ export const ExpensePage = () => {
         </label>
 
         <label>
-          Reason / explanation
+          {fieldLabel}
           <AutoGrowTextarea
             value={description}
             onChange={(event) => {
@@ -117,41 +128,18 @@ export const ExpensePage = () => {
               resetOperationId();
             }}
             maxLength={MAX_DESCRIPTION_LENGTH}
-            placeholder="Example: Fuel for delivery"
+            placeholder={placeholder}
             disabled={submitting}
           />
           <span className="field-count">{description.length}/{MAX_DESCRIPTION_LENGTH}</span>
         </label>
-
-        <fieldset className="expense-category-fieldset">
-          <legend>Expense category</legend>
-          <div className="expense-category-grid">
-            {EXPENSE_CATEGORIES.map((option) => (
-              <button
-                key={option.id}
-                type="button"
-                className={category === option.id ? 'selected' : ''}
-                aria-pressed={category === option.id}
-                disabled={submitting}
-                onClick={() => {
-                  setDescription((current) => getExpenseDescriptionForCategory(current, category, option.id));
-                  setCategory(option.id);
-                  resetOperationId();
-                }}
-              >
-                <ExpenseCategoryIcon category={option.id} size={22} />
-                <span>{option.label}</span>
-              </button>
-            ))}
-          </div>
-        </fieldset>
 
         <button
           className="primary-button submit-button"
           type="submit"
           disabled={submitting || !online || !summary || !isShopCashInitialized(summary)}
         >
-          <Save size={21} /> {submitting ? 'Saving...' : 'Save expense'}
+          <Save size={21} /> {submitting ? 'Saving...' : submitLabel}
         </button>
       </form>
     </div>

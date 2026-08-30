@@ -23,7 +23,7 @@ const isCashHistoryCategory = (value: string | undefined): value is CashHistoryC
 
 export const CategoryHistoryPage = () => {
   const { category: categoryParam } = useParams<{ category: string }>();
-  const { currentShopId } = useAuth();
+  const { currentShopId, profile } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
   const category = isCashHistoryCategory(categoryParam) ? categoryParam : null;
@@ -44,6 +44,10 @@ export const CategoryHistoryPage = () => {
     });
   }, [location.pathname, navigate]);
 
+  const editExpense = useCallback((expenseId: string) => {
+    navigate(`/expense/${expenseId}/edit`, { state: { returnTo: location.pathname } });
+  }, [location.pathname, navigate]);
+
   if (!category) return <Navigate to="/" replace />;
   const details = categoryDetails[category];
 
@@ -60,6 +64,7 @@ export const CategoryHistoryPage = () => {
         loadMonth={loadMonth}
         loadPreviousDates={loadPreviousDates}
         onEditTransfer={editTransfer}
+        onEditExpense={profile?.role === 'Admin' ? editExpense : undefined}
       />
     </div>
   );

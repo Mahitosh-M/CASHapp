@@ -60,8 +60,8 @@ The CRM rules should be extended in the CRM repository, reviewed, emulator-teste
 
 1. Only active `Staff` and `Admin` profiles can access cash records.
 2. Staff can get only their assigned `shopCash` document. Collection listing remains denied.
-3. Staff can create an expense only for their assigned shop, with a positive bounded amount, a recognized optional accounting category for legacy-client compatibility, trimmed bounded description, their own UID, and an authoritative timestamp.
-4. Staff cannot update or delete expense audit records. Any Admin correction policy must be explicit and audited.
+3. Staff can create an expense, purchase, or EMI payment only for their assigned shop, with a positive bounded amount, a recognized optional accounting category for legacy-client compatibility, trimmed bounded description, their own UID, and an authoritative timestamp. The `purchases` category represents COGS and `emi` represents a financing cash outflow.
+4. Staff cannot update or delete expense records. Admin can update or delete them only when the same transaction creates an immutable `cashExpenseCorrections` record containing the exact before/after amount, category, and description.
 5. Staff can create a transfer only from their assigned shop to the other valid shop.
 6. Staff cannot update or delete transfer audit records.
 7. An expense batch may change only `availableBalance`, `totalExpenses`, and `updatedAt` on the sender summary, with matching opposite/positive amount deltas.
@@ -73,6 +73,7 @@ The CRM rules should be extended in the CRM repository, reviewed, emulator-teste
 13. Admin initialization must create `cashInitializations/{shopId}` once and preserve any CRM collections already tracked.
 14. Only Admin can create a manual adjustment, and its add/deduct amount must exactly match the selected shop summary delta.
 15. Adjustment records are immutable, require a nonblank reason, and must exactly match the resulting balance even when it is negative.
+16. An Admin expense correction must change `availableBalance` and `totalExpenses` by the exact difference between the old and new amount. Deletion must restore the full original amount, and correction audit records cannot be updated or deleted.
 
 Cross-document validation uses `getAfter()` to prove the immutable record and exact summary effects are in the same atomic batch. Staff do not receive broad summary write access.
 

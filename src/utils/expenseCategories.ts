@@ -11,13 +11,18 @@ export const EXPENSE_CATEGORIES: ExpenseCategoryOption[] = [
   { id: 'electricity', label: 'Electricity' },
   { id: 'rent', label: 'Rent' },
   { id: 'transport', label: 'Transport (VRL)' },
-  { id: 'supplies', label: 'Office supplies' },
-  { id: 'taxes', label: 'Taxes & fees' },
+  { id: 'supplies', label: 'Office Supplies' },
+  { id: 'taxes', label: 'Taxes & Fees' },
   { id: 'other', label: 'Other' }
 ];
 
+export const PURCHASE_CATEGORY: ExpenseCategoryOption = { id: 'purchases', label: 'Purchases' };
+export const EMI_CATEGORY: ExpenseCategoryOption = { id: 'emi', label: 'EMI' };
+
+export const CASH_OUTFLOW_CATEGORIES = [PURCHASE_CATEGORY, EMI_CATEGORY, ...EXPENSE_CATEGORIES];
+
 export const isExpenseCategory = (value: unknown): value is ExpenseCategory => (
-  typeof value === 'string' && EXPENSE_CATEGORIES.some((category) => category.id === value)
+  typeof value === 'string' && CASH_OUTFLOW_CATEGORIES.some((category) => category.id === value)
 );
 
 export const normalizeExpenseCategory = (value: unknown): ExpenseCategory => (
@@ -25,7 +30,7 @@ export const normalizeExpenseCategory = (value: unknown): ExpenseCategory => (
 );
 
 export const getExpenseCategoryLabel = (category: ExpenseCategory) => (
-  EXPENSE_CATEGORIES.find((option) => option.id === category)?.label ?? 'Other'
+  CASH_OUTFLOW_CATEGORIES.find((option) => option.id === category)?.label ?? 'Other'
 );
 
 export const getExpenseDescriptionForCategory = (

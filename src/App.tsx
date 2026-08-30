@@ -7,9 +7,12 @@ import { ExpensePage } from './pages/ExpensePage';
 import { AdminPage } from './pages/AdminPage';
 import { CategoryHistoryPage } from './pages/CategoryHistoryPage';
 import { EditTransferPage } from './pages/EditTransferPage';
+import { EditExpensePage } from './pages/EditExpensePage';
+import { EmiPage } from './pages/EmiPage';
 import { HistoryPage } from './pages/HistoryPage';
 import { HomePage } from './pages/HomePage';
 import { LoginPage } from './pages/LoginPage';
+import { PurchasePage } from './pages/PurchasePage';
 import { TransferPage } from './pages/TransferPage';
 
 const AppRoutes = () => {
@@ -24,7 +27,10 @@ const AppRoutes = () => {
         <Route element={<AppShell />}>
           <Route index element={<HomePage />} />
           <Route path="expense" element={<ExpensePage />} />
+          <Route path="expense/:expenseId/edit" element={profile.role === 'Admin' ? <EditExpensePage /> : <Navigate to="/history/expenses" replace />} />
           <Route path="transfer" element={<TransferPage />} />
+          <Route path="purchase" element={<PurchasePage />} />
+          <Route path="emi" element={<EmiPage />} />
           <Route path="transfer/:transferId/edit" element={<EditTransferPage />} />
           <Route path="history" element={<HistoryPage />} />
           <Route path="history/:category" element={<CategoryHistoryPage />} />

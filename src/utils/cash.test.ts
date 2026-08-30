@@ -4,6 +4,8 @@ import type { CashHistoryItem, ShopCashSummary } from '../types';
 import {
   MAX_MONEY_AMOUNT,
   applyAdjustmentToSummary,
+  applyExpenseDeletionToSummary,
+  applyExpenseEditToSummary,
   applyExpenseToSummary,
   applyInitializationToSummary,
   applyTransferDeletionToSummary,
@@ -110,6 +112,30 @@ describe('local summary updates', () => {
     const next = applyExpenseToSummary(summary, 12_500);
     expect(next.availableBalance).toBe(-2_500);
     expect(next.totalExpenses).toBe(14_500);
+  });
+
+  it('applies only the amount difference when Admin increases an expense', () => {
+    const next = applyExpenseEditToSummary(summary, 750, 900);
+
+    expect(next.availableBalance).toBe(9_850);
+    expect(next.totalExpenses).toBe(2_150);
+    expect(next.totalCollections).toBe(summary.totalCollections);
+  });
+
+  it('applies only the amount difference when Admin reduces an expense', () => {
+    const next = applyExpenseEditToSummary(summary, 750, 500);
+
+    expect(next.availableBalance).toBe(10_250);
+    expect(next.totalExpenses).toBe(1_750);
+    expect(next.totalCollections).toBe(summary.totalCollections);
+  });
+
+  it('restores the full amount when Admin deletes an expense', () => {
+    const next = applyExpenseDeletionToSummary(summary, 750);
+
+    expect(next.availableBalance).toBe(10_750);
+    expect(next.totalExpenses).toBe(1_250);
+    expect(next.totalCollections).toBe(summary.totalCollections);
   });
 
   it('applies outgoing and incoming transfers without changing collections', () => {

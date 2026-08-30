@@ -1,6 +1,7 @@
 import { IndianRupee, Save, Trash2 } from 'lucide-react';
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { Navigate, useLocation, useNavigate, useParams } from 'react-router-dom';
+import { AutoGrowTextarea } from '../components/AutoGrowTextarea';
 import { CashFlowArrows } from '../components/CashFlowArrows';
 import { PageHeader } from '../components/PageHeader';
 import { WholeRupeeInput } from '../components/WholeRupeeInput';
@@ -234,11 +235,10 @@ export const EditTransferPage = () => {
 
           <label>
             Note <span className="optional-label">Optional</span>
-            <textarea
+            <AutoGrowTextarea
               value={note}
               onChange={(event) => setNote(event.target.value)}
               maxLength={MAX_DESCRIPTION_LENGTH}
-              rows={3}
               disabled={submitting}
             />
             <span className="field-count">{note.length}/{MAX_DESCRIPTION_LENGTH}</span>

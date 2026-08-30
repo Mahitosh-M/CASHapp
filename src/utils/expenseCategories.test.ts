@@ -30,4 +30,12 @@ describe('expense categories', () => {
   it('maps the replaced maintenance category to Transport for legacy records', () => {
     expect(normalizeExpenseCategory('maintenance')).toBe('transport');
   });
+
+  it('keeps Purchases as a dedicated accounting category', () => {
+    expect(normalizeExpenseCategory('purchases')).toBe('purchases');
+  });
+
+  it('keeps EMI as a dedicated financing category', () => {
+    expect(normalizeExpenseCategory('emi')).toBe('emi');
+  });
 });

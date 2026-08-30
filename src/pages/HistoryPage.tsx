@@ -6,7 +6,7 @@ import { useAuth } from '../context/AuthContext';
 import { getCashHistoryMonth, getCashPreviousHistoryDates } from '../services/cashService';
 
 export const HistoryPage = () => {
-  const { currentShopId } = useAuth();
+  const { currentShopId, profile } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -26,6 +26,10 @@ export const HistoryPage = () => {
     });
   }, [location.pathname, navigate]);
 
+  const editExpense = useCallback((expenseId: string) => {
+    navigate(`/expense/${expenseId}/edit`, { state: { returnTo: location.pathname } });
+  }, [location.pathname, navigate]);
+
   return (
     <div className="page history-page">
       <PageHeader title="History" subtitle="Cash activity by month" />
@@ -35,6 +39,7 @@ export const HistoryPage = () => {
         loadMonth={loadMonth}
         loadPreviousDates={loadPreviousDates}
         onEditTransfer={editTransfer}
+        onEditExpense={profile?.role === 'Admin' ? editExpense : undefined}
       />
     </div>
   );

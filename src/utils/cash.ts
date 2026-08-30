@@ -88,6 +88,30 @@ export const applyExpenseToSummary = (summary: ShopCashSummary, amount: number):
   updatedAt: new Date().toISOString()
 });
 
+export const applyExpenseEditToSummary = (
+  summary: ShopCashSummary,
+  previousAmount: number,
+  nextAmount: number
+): ShopCashSummary => {
+  const difference = nextAmount - previousAmount;
+  return {
+    ...summary,
+    availableBalance: summary.availableBalance - difference,
+    totalExpenses: summary.totalExpenses + difference,
+    updatedAt: new Date().toISOString()
+  };
+};
+
+export const applyExpenseDeletionToSummary = (
+  summary: ShopCashSummary,
+  amount: number
+): ShopCashSummary => ({
+  ...summary,
+  availableBalance: summary.availableBalance + amount,
+  totalExpenses: summary.totalExpenses - amount,
+  updatedAt: new Date().toISOString()
+});
+
 export const applyTransferToSummary = (
   summary: ShopCashSummary,
   amount: number,

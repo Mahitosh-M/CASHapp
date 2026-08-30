@@ -5,6 +5,8 @@ import type { CashAdjustmentDirection, ShopCashSummary } from '../types';
 import {
   applyAdjustmentToSummary,
   applyExpenseToSummary,
+  applyExpenseDeletionToSummary,
+  applyExpenseEditToSummary,
   applyInitializationToSummary,
   applyTransferDeletionToSummary,
   applyTransferToSummary
@@ -19,6 +21,8 @@ interface CashContextValue {
   refreshSummary: () => Promise<void>;
   applyInitializationLocally: (openingBalance: number, initializedBy: string) => void;
   applyExpenseLocally: (amount: number) => void;
+  applyExpenseEditLocally: (previousAmount: number, nextAmount: number) => void;
+  applyExpenseDeletionLocally: (amount: number) => void;
   applyTransferLocally: (amount: number) => void;
   applyTransferEditLocally: (amountDifference: number) => void;
   applyTransferDeletionLocally: (amount: number) => void;
@@ -87,6 +91,16 @@ export const CashProvider = ({ children }: { children: ReactNode }) => {
     setSummary((current) => current ? applyExpenseToSummary(current, amount) : current);
   };
 
+  const applyExpenseEditLocally = (previousAmount: number, nextAmount: number) => {
+    setSummary((current) => current
+      ? applyExpenseEditToSummary(current, previousAmount, nextAmount)
+      : current);
+  };
+
+  const applyExpenseDeletionLocally = (amount: number) => {
+    setSummary((current) => current ? applyExpenseDeletionToSummary(current, amount) : current);
+  };
+
   const applyInitializationLocally = (openingBalance: number, initializedBy: string) => {
     if (!currentShopId) return;
     setSummary((current) => applyInitializationToSummary(current, currentShopId, openingBalance, initializedBy));
@@ -119,6 +133,8 @@ export const CashProvider = ({ children }: { children: ReactNode }) => {
     refreshSummary,
     applyInitializationLocally,
     applyExpenseLocally,
+    applyExpenseEditLocally,
+    applyExpenseDeletionLocally,
     applyTransferLocally,
     applyTransferEditLocally,
     applyTransferDeletionLocally,
