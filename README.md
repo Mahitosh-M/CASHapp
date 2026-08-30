@@ -41,10 +41,11 @@ npm run build
 - Startup: Firebase Auth restore, one `users/{uid}` profile read, one assigned `shopCash/{shopId}` read.
 - Foreground refresh after the app has been away for at least 30 seconds: one assigned summary read.
 - Initialization: one immutable audit write plus one summary write; Admin-only and one-time.
-- Expense: one `cashExpenses` create plus one own-shop summary update in one batch.
+- Expense: one categorized `cashExpenses` create plus one own-shop summary update in one batch.
 - Transfer: one `shopTransfers` create plus two summary updates in one batch.
-- Admin adjustment: one immutable `cashAdjustments` create plus one selected-shop summary update in one batch.
-- History: four bounded queries, only when History is opened; results remain cached during that app session.
+- Admin adjustment: one immutable `cashAdjustments` create plus one selected-shop summary update in one batch; audited deductions may produce or deepen a negative balance.
+- History: four bounded monthly queries, only when History is opened; results remain cached during that app session.
+- Admin reports: two selected-month queries for cash collections and categorized expenses, loaded only when Reports is opened.
 - No listeners, polling, Cloud Functions, payment scans, or customer-data reads.
 
 Admin and Staff use separate login commands on the same form, but both authenticate against the existing CIS Firebase Auth project. The CIS `users/{uid}.role` remains authoritative; selecting Admin login never grants or changes a role.

@@ -2,11 +2,13 @@ import { IndianRupee, Save } from 'lucide-react';
 import { useRef, useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { PageHeader } from '../components/PageHeader';
+import { ExpenseCategoryIcon } from '../components/ExpenseCategoryIcon';
 import { WholeRupeeInput } from '../components/WholeRupeeInput';
 import { useAuth } from '../context/AuthContext';
 import { useCash } from '../context/CashContext';
 import { useOnlineStatus } from '../hooks/useOnlineStatus';
 import { createExpense, createExpenseId, getFriendlyCashError } from '../services/cashService';
+import type { ExpenseCategory } from '../types';
 import {
   MAX_DESCRIPTION_LENGTH,
   formatMoney,
@@ -15,6 +17,11 @@ import {
   parseMoneyInput,
   validateDescription
 } from '../utils/cash';
+import {
+  EXPENSE_CATEGORIES,
+  getExpenseDescriptionForCategory,
+  resolveExpenseDetails
+} from '../utils/expenseCategories';
 
 export const ExpensePage = () => {
   const { currentShopId, firebaseUser } = useAuth();
@@ -22,6 +29,7 @@ export const ExpensePage = () => {
   const online = useOnlineStatus();
   const navigate = useNavigate();
   const operationId = useRef<string | null>(null);
+  const [category, setCategory] = useState<ExpenseCategory | ''>('');
   const [amountText, setAmountText] = useState('');
   const [description, setDescription] = useState('');
   const [error, setError] = useState('');
@@ -48,7 +56,8 @@ export const ExpensePage = () => {
       setError('Enter a whole rupee amount greater than zero.');
       return;
     }
-    const descriptionError = validateDescription(description);
+    const expenseDetails = resolveExpenseDetails(category, description);
+    const descriptionError = validateDescription(expenseDetails.description);
     if (descriptionError) {
       setError(descriptionError);
       return;
@@ -62,7 +71,8 @@ export const ExpensePage = () => {
         id: operationId.current,
         shopId: currentShopId,
         amount,
-        description: description.trim(),
+        category: expenseDetails.category,
+        description: expenseDetails.description,
         createdBy: firebaseUser.uid
       });
       applyExpenseLocally(amount);
@@ -112,6 +122,29 @@ export const ExpensePage = () => {
           />
           <span className="field-count">{description.length}/{MAX_DESCRIPTION_LENGTH}</span>
         </label>
+
+        <fieldset className="expense-category-fieldset">
+          <legend>Expense category</legend>
+          <div className="expense-category-grid">
+            {EXPENSE_CATEGORIES.map((option) => (
+              <button
+                key={option.id}
+                type="button"
+                className={category === option.id ? 'selected' : ''}
+                aria-pressed={category === option.id}
+                disabled={submitting}
+                onClick={() => {
+                  setDescription((current) => getExpenseDescriptionForCategory(current, category, option.id));
+                  setCategory(option.id);
+                  resetOperationId();
+                }}
+              >
+                <ExpenseCategoryIcon category={option.id} size={22} />
+                <span>{option.label}</span>
+              </button>
+            ))}
+          </div>
+        </fieldset>
 
         <button
           className="primary-button submit-button"

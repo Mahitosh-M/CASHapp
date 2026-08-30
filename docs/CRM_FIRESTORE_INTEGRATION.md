@@ -60,7 +60,7 @@ The CRM rules should be extended in the CRM repository, reviewed, emulator-teste
 
 1. Only active `Staff` and `Admin` profiles can access cash records.
 2. Staff can get only their assigned `shopCash` document. Collection listing remains denied.
-3. Staff can create an expense only for their assigned shop, with a positive bounded amount, trimmed bounded description, their own UID, and an authoritative timestamp.
+3. Staff can create an expense only for their assigned shop, with a positive bounded amount, a recognized optional accounting category for legacy-client compatibility, trimmed bounded description, their own UID, and an authoritative timestamp.
 4. Staff cannot update or delete expense audit records. Any Admin correction policy must be explicit and audited.
 5. Staff can create a transfer only from their assigned shop to the other valid shop.
 6. Staff cannot update or delete transfer audit records.
@@ -68,11 +68,11 @@ The CRM rules should be extended in the CRM repository, reviewed, emulator-teste
 8. A transfer batch may change only sender balance/out total and receiver balance/in total. It must never change `totalCollections`.
 9. ASHOKA staff cannot directly create an SMPA expense, or vice versa.
 10. CRM payment batches must retain their current collection behavior and legacy-record compatibility, and each normal summary delta must be linked to the exact matching payment mutation.
-11. Resulting balances should not be negative where the rule design can enforce this safely.
+11. Audited expenses and Admin deductions may produce negative cash balances; transfer-specific sufficiency checks remain enforced.
 12. Reusing an existing expense or transfer document ID must be denied to reduce manual retry duplication risk.
 13. Admin initialization must create `cashInitializations/{shopId}` once and preserve any CRM collections already tracked.
 14. Only Admin can create a manual adjustment, and its add/deduct amount must exactly match the selected shop summary delta.
-15. Adjustment records are immutable, require a nonblank reason, and cannot make the available amount negative.
+15. Adjustment records are immutable, require a nonblank reason, and must exactly match the resulting balance even when it is negative.
 
 Cross-document validation uses `getAfter()` to prove the immutable record and exact summary effects are in the same atomic batch. Staff do not receive broad summary write access.
 
@@ -80,13 +80,14 @@ Cross-document validation uses `getAfter()` to prove the immutable record and ex
 
 Merge the entries in `docs/firestore.indexes.required.json` into the CRM's existing `firestore.indexes.json`. Do not replace the CRM index file.
 
-History then performs these bounded queries only after the History page opens:
+History and Admin reports perform month-bounded queries only after the relevant view opens:
 
 ```text
-cashExpenses: shopId == assigned shop, createdAt desc, limit 10
-shopTransfers: fromShopId == assigned shop, createdAt desc, limit 10
-shopTransfers: toShopId == assigned shop, createdAt desc, limit 10
-cashAdjustments: shopId == assigned shop, createdAt desc, limit 10
+cashExpenses: shopId == assigned shop, selected createdAt month, createdAt desc
+shopTransfers: fromShopId == assigned shop, selected createdAt month, createdAt desc
+shopTransfers: toShopId == assigned shop, selected createdAt month, createdAt desc
+cashAdjustments: shopId == assigned shop, selected createdAt month, createdAt desc
+payments: shopId == assigned shop, affectsShopCash == true, selected createdAt month, createdAt desc
 ```
 
 ## Safe rollout order

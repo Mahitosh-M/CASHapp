@@ -30,6 +30,7 @@ import type {
   ShopTransferUpdateInput
 } from '../types';
 import { createEmptyShopSummary, sortCashHistory } from '../utils/cash';
+import { getExpenseCategoryLabel, normalizeExpenseCategory } from '../utils/expenseCategories';
 import { getShopName, isShopId } from '../utils/shops';
 
 const SHOP_CASH = 'shopCash';
@@ -131,6 +132,7 @@ export const createExpense = async (input: CashExpenseInput) => {
   batch.set(doc(db, CASH_EXPENSES, input.id), {
     shopId: input.shopId,
     amount: input.amount,
+    category: input.category,
     description: input.description.trim(),
     createdAt: serverTimestamp(),
     createdBy: input.createdBy
@@ -310,11 +312,14 @@ export const createCashAdjustment = async (input: CashAdjustmentInput) => {
 
 const mapExpenseHistory = (snapshot: QueryDocumentSnapshot<DocumentData>): CashHistoryItem => {
   const data = snapshot.data();
+  const expenseCategory = normalizeExpenseCategory(data.category);
   return {
     id: snapshot.id,
     kind: 'expense',
     amount: numberOrZero(data.amount),
     title: String(data.description || 'Expense'),
+    detail: getExpenseCategoryLabel(expenseCategory),
+    expenseCategory,
     createdAt: historyDateOrNull(data.createdAt)
   };
 };

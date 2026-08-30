@@ -150,6 +150,12 @@ describe('local summary updates', () => {
     expect(added.totalCollections).toBe(summary.totalCollections);
     expect(deducted.totalExpenses).toBe(summary.totalExpenses);
   });
+
+  it('allows Admin additions and deductions while the available balance is negative', () => {
+    const negativeSummary = { ...summary, availableBalance: -1_000 };
+    expect(applyAdjustmentToSummary(negativeSummary, 400, 'add').availableBalance).toBe(-600);
+    expect(applyAdjustmentToSummary(negativeSummary, 400, 'deduct').availableBalance).toBe(-1_400);
+  });
 });
 
 describe('cash movement detection', () => {

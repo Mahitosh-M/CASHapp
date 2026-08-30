@@ -1,7 +1,8 @@
-import { CircleMinus, CirclePlus, IndianRupee, SlidersHorizontal } from 'lucide-react';
+import { ChartNoAxesCombined, CircleMinus, CirclePlus, IndianRupee, SlidersHorizontal } from 'lucide-react';
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
 import { PageHeader } from '../components/PageHeader';
+import { AdminAccountingReport } from '../components/AdminAccountingReport';
 import { WholeRupeeInput } from '../components/WholeRupeeInput';
 import { useAuth } from '../context/AuthContext';
 import { useCash } from '../context/CashContext';
@@ -27,6 +28,7 @@ export const AdminPage = () => {
   const online = useOnlineStatus();
   const navigate = useNavigate();
   const operationId = useRef<string | null>(null);
+  const [adminView, setAdminView] = useState<'adjust' | 'reports'>('adjust');
   const [direction, setDirection] = useState<CashAdjustmentDirection>('add');
   const [amountText, setAmountText] = useState('');
   const [reason, setReason] = useState('');
@@ -59,9 +61,6 @@ export const AdminPage = () => {
     }
     if (!isValidMoneyAmount(amount)) {
       return 'Enter a whole rupee amount greater than zero.';
-    }
-    if (direction === 'deduct' && amount > summary.availableBalance) {
-      return 'Deduction cannot exceed the available amount.';
     }
     if (!reason.trim()) return 'Enter a reason for this adjustment.';
     if (reason.trim().length > MAX_DESCRIPTION_LENGTH) {
@@ -121,15 +120,26 @@ export const AdminPage = () => {
 
   return (
     <div className="page admin-page">
-      <PageHeader title="Adjust amount" subtitle={`Admin control for ${selectedShopName}`} />
-      {error ? <div className="notice error" role="alert">{error}</div> : null}
+      <PageHeader title="Admin" subtitle={`Controls and accounting for ${selectedShopName}`} />
 
-      <section className="admin-current-balance" aria-label="Current available amount">
-        <span>CURRENT AVAILABLE</span>
-        <strong>{formatMoney(summary?.availableBalance ?? 0)}</strong>
-      </section>
+      <div className="admin-view-tabs" role="tablist" aria-label="Admin view">
+        <button type="button" role="tab" aria-selected={adminView === 'adjust'} className={adminView === 'adjust' ? 'selected' : ''} onClick={() => setAdminView('adjust')}>
+          <SlidersHorizontal size={19} /> Adjust
+        </button>
+        <button type="button" role="tab" aria-selected={adminView === 'reports'} className={adminView === 'reports' ? 'selected' : ''} onClick={() => setAdminView('reports')}>
+          <ChartNoAxesCombined size={19} /> Reports
+        </button>
+      </div>
 
-      <form className="cash-form admin-adjustment-form" onSubmit={handlePrepare}>
+      {adminView === 'adjust' ? <div role="tabpanel">
+        {error ? <div className="notice error" role="alert">{error}</div> : null}
+
+        <section className="admin-current-balance" aria-label="Current available amount">
+          <span>CURRENT AVAILABLE</span>
+          <strong className={(summary?.availableBalance ?? 0) < 0 ? 'negative' : ''}>{formatMoney(summary?.availableBalance ?? 0)}</strong>
+        </section>
+
+        <form className="cash-form admin-adjustment-form" onSubmit={handlePrepare}>
         <div className="adjustment-direction" role="group" aria-label="Adjustment type">
           <button
             type="button"
@@ -196,7 +206,12 @@ export const AdminPage = () => {
         >
           <SlidersHorizontal size={21} /> Review adjustment
         </button>
-      </form>
+        </form>
+      </div> : currentShopId ? (
+        <div role="tabpanel">
+          <AdminAccountingReport shopId={currentShopId} availableBalance={summary?.availableBalance ?? 0} />
+        </div>
+      ) : null}
 
       {confirming ? (
         <div className="modal-backdrop" role="presentation">

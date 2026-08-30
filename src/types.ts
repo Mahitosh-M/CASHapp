@@ -4,6 +4,7 @@ export type ShopId = 'SHOP_A' | 'SHOP_S';
 export type CashAppRole = 'Admin' | 'Staff';
 export type CashAdjustmentDirection = 'add' | 'deduct';
 export type CashHistoryCategory = 'collections' | 'expenses' | 'transfers-in' | 'transfers-out';
+export type ExpenseCategory = 'salary' | 'fuel' | 'electricity' | 'rent' | 'transport' | 'supplies' | 'taxes' | 'other';
 
 export interface StaffProfile {
   id: string;
@@ -56,6 +57,7 @@ export interface CashExpenseInput {
   id: string;
   shopId: ShopId;
   amount: number;
+  category: ExpenseCategory;
   description: string;
   createdBy: string;
 }
@@ -97,5 +99,6 @@ export interface CashHistoryItem {
   amount: number;
   title: string;
   detail?: string;
+  expenseCategory?: ExpenseCategory;
   createdAt?: Timestamp | string | null;
 }
