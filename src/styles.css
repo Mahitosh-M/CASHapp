@@ -1334,6 +1334,15 @@ button:disabled {
   border-color: rgba(91, 211, 181, 0.3);
 }
 
+.history-export { display:flex; flex-direction:row; align-items:end; justify-content:flex-start; gap:12px; flex-wrap:nowrap; padding:16px; margin-bottom:18px; border:1px solid var(--border); border-radius:14px; background:var(--page-background, transparent); overflow-x:auto; }
+.history-export > div:first-child { display:flex; flex-direction:row; gap:10px; white-space:nowrap; flex:0 0 auto; }
+.history-export span { color:#64748b; font-size:.86rem; }
+.history-export label { display:grid; gap:5px; font-size:.8rem; font-weight:700; color:#475569; }
+.history-export input { min-height:38px; }
+.history-export-dates { display:flex; flex-direction:row; flex:0 0 auto; gap:10px; align-items:end; white-space:nowrap; }
+.history-export .history-download-button { flex:0 0 42px; }
+.history-download-button { width:42px; height:42px; display:grid; place-items:center; padding:0; border-radius:11px; }
+
 .cash-form select {
   width: 100%;
   min-height: 52px;

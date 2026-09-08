@@ -11,6 +11,7 @@ import {
   type HistoryMonth
 } from '../utils/historyMonths';
 import { CashHistoryList } from './CashHistoryList';
+import { jsPDF } from 'jspdf';
 
 interface LoadedMonth {
   items: CashHistoryItem[];
@@ -26,6 +27,8 @@ interface MonthlyHistorySectionsProps {
   loadPreviousDates: (before: Date) => Promise<Date[]>;
   onEditTransfer?: (transferId: string) => void;
   onEditExpense?: (expenseId: string) => void;
+  shopName?: string;
+  showPdfButtons?: boolean;
 }
 
 const emptyMonth: LoadedMonth = {
@@ -42,6 +45,7 @@ export const MonthlyHistorySections = ({
   loadPreviousDates,
   onEditTransfer,
   onEditExpense
+  ,shopName = 'SHOP', showPdfButtons = true
 }: MonthlyHistorySectionsProps) => {
   const currentMonth = useMemo(() => getHistoryMonth(new Date()), []);
   const [currentItems, setCurrentItems] = useState<CashHistoryItem[]>([]);
@@ -118,6 +122,14 @@ export const MonthlyHistorySections = ({
       }));
     }
   };
+  const downloadPdf = (month: HistoryMonth, items: CashHistoryItem[]) => {
+    const pdf = new jsPDF(); const label = getHistoryMonthLabel(month); let y = 24; let balance = 0;
+    pdf.setFillColor(30, 64, 175); pdf.rect(0, 0, 210, 20, 'F'); pdf.setTextColor(255, 255, 255); pdf.setFontSize(18); pdf.text(`${shopName} CASH HISTORY`, 14, 13);
+    pdf.setTextColor(50, 50, 80); pdf.setFontSize(11); pdf.text(label, 14, 28); pdf.setFillColor(238, 242, 255); pdf.rect(14, 33, 182, 9, 'F'); pdf.setFontSize(10); pdf.text('DATE / DETAILS', 16, 39); pdf.text('INCOMING', 105, 39); pdf.text('OUTGOING', 137, 39); pdf.text('BALANCE', 170, 39); y = 49;
+    const rows = [...items].reverse().map((item) => { const incoming = item.kind === 'collection' || item.kind === 'transfer-in' || item.kind === 'adjustment-in'; balance += incoming ? item.amount : -item.amount; return { item, incoming, balance }; }).reverse();
+    rows.forEach(({ item, incoming, balance: rowBalance }) => { pdf.setTextColor(45,45,60); pdf.text(`${item.title}`.slice(0, 42), 16, y); pdf.setTextColor(22, 130, 70); if (incoming) pdf.text(`Rs ${item.amount.toFixed(2)}`, 105, y); else pdf.text('-', 105, y); pdf.setTextColor(185, 28, 28); if (!incoming) pdf.text(`Rs ${item.amount.toFixed(2)}`, 137, y); else pdf.text('-', 137, y); pdf.setTextColor(rowBalance >= 0 ? 22 : 185, rowBalance >= 0 ? 130 : 28, rowBalance >= 0 ? 70 : 28); pdf.text(`Rs ${rowBalance.toFixed(2)}`, 170, y); y += 8; if (y > 280) { pdf.addPage(); y = 20; } });
+    pdf.save(`${shopName}-${getHistoryMonthKey(month)}-history.pdf`);
+  };
 
   if (loading) {
     return (
@@ -146,6 +158,7 @@ export const MonthlyHistorySections = ({
         <h2 id="current-history-month" className="history-month-title">
           {getHistoryMonthLabel(currentMonth)}
         </h2>
+        {showPdfButtons ? <button className="secondary" type="button" onClick={() => downloadPdf(currentMonth, currentItems)}>Download PDF</button> : null}
         {currentItems.length > 0
           ? <CashHistoryList items={currentItems} onEditTransfer={onEditTransfer} onEditExpense={onEditExpense} />
           : <div className="history-month-empty">No entries this month.</div>}
@@ -171,6 +184,7 @@ export const MonthlyHistorySections = ({
               </button>
               {expanded ? (
                 <div className="history-month-content" id={contentId}>
+                  {showPdfButtons && monthState.loaded && monthState.items.length > 0 ? <button className="secondary" type="button" onClick={() => downloadPdf(month, monthState.items)}>Download PDF</button> : null}
                   {monthState.loading ? (
                     <div className="history-month-loading" role="status">
                       <div className="loading-spinner" aria-hidden="true" />
