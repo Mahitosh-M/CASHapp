@@ -10,6 +10,7 @@ import { doc, getDoc } from 'firebase/firestore';
 import { auth, db } from '../firebase';
 import type { StaffProfile } from '../types';
 import { isShopId } from '../utils/shops';
+import { withLoginRateLimit } from '../utils/loginRateLimit';
 
 const normalizeEmail = (email: string) => email.trim().toLowerCase();
 
@@ -17,7 +18,10 @@ export const listenToAuthState = (callback: (user: User | null) => void) => onAu
 
 export const loginWithEmail = async (email: string, password: string) => {
   await setPersistence(auth, browserLocalPersistence);
-  return signInWithEmailAndPassword(auth, normalizeEmail(email), password);
+  const normalizedEmail = normalizeEmail(email);
+  return withLoginRateLimit(normalizedEmail, () =>
+    signInWithEmailAndPassword(auth, normalizedEmail, password)
+  );
 };
 
 export const logoutUser = () => signOut(auth);
