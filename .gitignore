@@ -9,3 +9,16 @@ ui-debug.log
 *.tsbuildinfo
 vite.config.js
 vite.config.d.ts
+
+# Local configuration and private credentials
+.env
+.env.*
+!.env.example
+*-debug.log*
+*.pem
+*.key
+*.p12
+*.pfx
+**/*service-account*.json
+**/*serviceAccount*.json
+**/credentials.json

@@ -39,18 +39,18 @@ export const formatMoney = (amount: number) => new Intl.NumberFormat('en-IN', {
   style: 'currency',
   currency: 'INR',
   minimumFractionDigits: 0,
-  maximumFractionDigits: 0
-}).format(Math.round(amount));
+  maximumFractionDigits: 2
+}).format(Math.round(amount * 100) / 100);
 
-const toWholeRupees = (amount: number) => Math.round(amount);
+const toPaisePrecision = (amount: number) => Math.round(amount * 100) / 100;
 
 export const createCashBalanceSnapshot = (summary: ShopCashSummary): CashBalanceSnapshot => ({
-  availableBalance: toWholeRupees(summary.availableBalance),
-  totalCollections: toWholeRupees(summary.totalCollections),
-  totalExpenses: toWholeRupees(summary.totalExpenses),
-  totalTransferredIn: toWholeRupees(summary.totalTransferredIn),
-  totalTransferredOut: toWholeRupees(summary.totalTransferredOut),
-  openingBalance: toWholeRupees(summary.openingBalance)
+  availableBalance: toPaisePrecision(summary.availableBalance),
+  totalCollections: toPaisePrecision(summary.totalCollections),
+  totalExpenses: toPaisePrecision(summary.totalExpenses),
+  totalTransferredIn: toPaisePrecision(summary.totalTransferredIn),
+  totalTransferredOut: toPaisePrecision(summary.totalTransferredOut),
+  openingBalance: toPaisePrecision(summary.openingBalance)
 });
 
 export const detectCashMovement = (

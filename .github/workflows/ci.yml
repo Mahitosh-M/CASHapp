@@ -1,6 +1,13 @@
 name: Cash App CI/CD
 
 on:
+  workflow_dispatch:
+    inputs:
+      deploy_live:
+        description: Deploy this app to live Firebase Hosting
+        type: boolean
+        required: true
+        default: false
   push:
     branches: [main]
   pull_request:
@@ -15,6 +22,8 @@ concurrency:
 jobs:
   verify:
     runs-on: ubuntu-latest
+    env:
+      VITE_FIREBASE_CONFIG: ${{ secrets.VITE_FIREBASE_CONFIG }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -30,7 +39,7 @@ jobs:
       - name: Build
         run: npm run build
       - name: Deploy to Firebase Hosting
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && inputs.deploy_live
         uses: FirebaseExtended/action-hosting-deploy@v0
         with:
           repoToken: ${{ secrets.GITHUB_TOKEN }}

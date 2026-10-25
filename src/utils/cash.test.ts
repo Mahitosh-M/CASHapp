@@ -74,10 +74,10 @@ describe('cash input validation', () => {
     expect(isWholeRupeeInput('-10')).toBe(false);
   });
 
-  it('formats balances and movement snapshots as whole rupees', () => {
-    expect(formatMoney(1_250.75)).toContain('1,251');
-    expect(formatMoney(1_250.75)).not.toContain('.');
-    expect(createCashBalanceSnapshot({ ...summary, availableBalance: 10_000.6 }).availableBalance).toBe(10_001);
+  it('preserves diesel paise in balances and movement snapshots', () => {
+    expect(formatMoney(1_250.75)).toContain('1,250.75');
+    expect(formatMoney(1_250)).not.toContain('.');
+    expect(createCashBalanceSnapshot({ ...summary, availableBalance: 10_000.6 }).availableBalance).toBe(10_000.6);
   });
 
   it('requires a trimmed expense explanation', () => {
