@@ -1,3 +1,4 @@
+import { assertLoginInput } from "../inputSecurity";
 import {
   browserLocalPersistence,
   onAuthStateChanged,
@@ -17,6 +18,7 @@ const normalizeEmail = (email: string) => email.trim().toLowerCase();
 export const listenToAuthState = (callback: (user: User | null) => void) => onAuthStateChanged(auth, callback);
 
 export const loginWithEmail = async (email: string, password: string) => {
+  assertLoginInput(email, password);
   await setPersistence(auth, browserLocalPersistence);
   const normalizedEmail = normalizeEmail(email);
   return withLoginRateLimit(normalizedEmail, () =>

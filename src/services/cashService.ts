@@ -1,3 +1,4 @@
+import { assertUserInput } from "../inputSecurity";
 import {
   Timestamp,
   collection,
@@ -107,6 +108,7 @@ export const getShopCash = async (shopId: ShopId): Promise<ShopCashSummary | nul
 };
 
 export const initializeShopCash = async (input: CashInitializationInput) => {
+  assertUserInput(input);
   const batch = writeBatch(db);
   batch.set(doc(db, CASH_INITIALIZATIONS, input.shopId), {
     shopId: input.shopId,
@@ -132,6 +134,7 @@ export const initializeShopCash = async (input: CashInitializationInput) => {
 };
 
 export const createExpense = async (input: CashExpenseInput) => {
+  assertUserInput(input);
   const batch = writeBatch(db);
   batch.set(doc(db, CASH_EXPENSES, input.id), {
     shopId: input.shopId,
@@ -175,6 +178,7 @@ export const getExpense = async (expenseId: string): Promise<CashExpenseRecord |
 };
 
 export const updateExpense = async (input: CashExpenseUpdateInput) => runTransaction(db, async (transaction) => {
+  assertUserInput(input);
   const expenseRef = doc(db, CASH_EXPENSES, input.id);
   const expenseSnapshot = await transaction.get(expenseRef);
   const existing = expenseSnapshot.exists()
@@ -270,6 +274,7 @@ export const deleteExpense = async (expenseId: string, deletedBy: string) => run
 });
 
 export const createTransfer = async (input: ShopTransferInput) => {
+  assertUserInput(input);
   const batch = writeBatch(db);
   batch.set(doc(db, SHOP_TRANSFERS, input.id), {
     fromShopId: input.fromShopId,
@@ -304,6 +309,7 @@ export const getTransfer = async (transferId: string): Promise<ShopTransferRecor
 };
 
 export const updateTransfer = async (input: ShopTransferUpdateInput) => runTransaction(db, async (transaction) => {
+  assertUserInput(input);
   const transferRef = doc(db, SHOP_TRANSFERS, input.id);
   const transferSnapshot = await transaction.get(transferRef);
   const existing = transferSnapshot.exists()
@@ -413,6 +419,7 @@ export const deleteTransfer = async (transferId: string) => runTransaction(db, a
 });
 
 export const createCashAdjustment = async (input: CashAdjustmentInput) => {
+  assertUserInput(input);
   const delta = input.direction === 'add' ? input.amount : -input.amount;
   const batch = writeBatch(db);
   batch.set(doc(db, CASH_ADJUSTMENTS, input.id), {
@@ -514,7 +521,7 @@ const getCategoryHistorySource = (
     };
   }
 
-  if (category === 'expenses') {
+  if (category === 'expenses' || category === 'fuel') {
     return {
       collectionName: CASH_EXPENSES,
       filters: [where('shopId', '==', shopId)],
@@ -591,7 +598,8 @@ export const getCashCategoryHistoryMonth = (
   category: CashHistoryCategory,
   start: Date,
   end: Date
-) => readHistoryMonth(getCategoryHistorySource(shopId, category), start, end);
+ ) => readHistoryMonth(getCategoryHistorySource(shopId, category), start, end)
+  .then(items => category === 'fuel' ? items.filter(item => item.expenseCategory === 'fuel') : items);
 
 export const getCashCategoryPreviousHistoryDates = (
   shopId: ShopId,

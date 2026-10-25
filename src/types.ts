@@ -3,7 +3,7 @@ import type { Timestamp } from 'firebase/firestore';
 export type ShopId = 'SHOP_A' | 'SHOP_S';
 export type CashAppRole = 'Admin' | 'Staff';
 export type CashAdjustmentDirection = 'add' | 'deduct';
-export type CashHistoryCategory = 'collections' | 'expenses' | 'transfers-in' | 'transfers-out';
+export type CashHistoryCategory = 'collections' | 'fuel' | 'expenses' | 'transfers-in' | 'transfers-out';
 export type ExpenseCategory = 'purchases' | 'emi' | 'salary' | 'fuel' | 'electricity' | 'rent' | 'transport' | 'supplies' | 'taxes' | 'other';
 
 export interface StaffProfile {

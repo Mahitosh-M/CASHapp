@@ -13,6 +13,7 @@ import { getShopName } from '../utils/shops';
 const categoryDetails: Record<CashHistoryCategory, { title: string; empty: string }> = {
   collections: { title: 'Collections', empty: 'No payment collections found.' },
   expenses: { title: 'Expenses', empty: 'No expenses found.' },
+  fuel: { title: 'Fuel', empty: 'No paid fuel expenses found.' },
   'transfers-in': { title: 'Transferred in', empty: 'No incoming transfers found.' },
   'transfers-out': { title: 'Transferred out', empty: 'No outgoing transfers found.' }
 };
@@ -58,6 +59,7 @@ export const CategoryHistoryPage = () => {
         subtitle={`Entries for ${currentShopId ? getShopName(currentShopId) : 'this shop'}`}
         backTo="/"
       />
+      {category === 'fuel' && <p className="notice">Dispatch diesel appears after shop-funded approval or personal reimbursement. Do not enter it a second time.</p>}
       <MonthlyHistorySections
         queryKey={`${currentShopId || 'none'}:${category}`}
         emptyText={details.empty}
