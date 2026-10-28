@@ -1,3 +1,4 @@
+import { roundCashBalance } from './wholeRupees';
 import type {
   CashAdjustmentDirection,
   CashBalanceSnapshot,
@@ -83,7 +84,7 @@ export const detectCashMovement = (
 
 export const applyExpenseToSummary = (summary: ShopCashSummary, amount: number): ShopCashSummary => ({
   ...summary,
-  availableBalance: summary.availableBalance - amount,
+  availableBalance: roundCashBalance(summary.availableBalance - amount).availableBalance,
   totalExpenses: summary.totalExpenses + amount,
   updatedAt: new Date().toISOString()
 });
@@ -96,7 +97,7 @@ export const applyExpenseEditToSummary = (
   const difference = nextAmount - previousAmount;
   return {
     ...summary,
-    availableBalance: summary.availableBalance - difference,
+    availableBalance: roundCashBalance(summary.availableBalance - difference).availableBalance,
     totalExpenses: summary.totalExpenses + difference,
     updatedAt: new Date().toISOString()
   };
@@ -107,7 +108,7 @@ export const applyExpenseDeletionToSummary = (
   amount: number
 ): ShopCashSummary => ({
   ...summary,
-  availableBalance: summary.availableBalance + amount,
+  availableBalance: roundCashBalance(summary.availableBalance + amount).availableBalance,
   totalExpenses: summary.totalExpenses - amount,
   updatedAt: new Date().toISOString()
 });
@@ -119,13 +120,13 @@ export const applyTransferToSummary = (
 ): ShopCashSummary => direction === 'out'
   ? {
       ...summary,
-      availableBalance: summary.availableBalance - amount,
+      availableBalance: roundCashBalance(summary.availableBalance - amount).availableBalance,
       totalTransferredOut: summary.totalTransferredOut + amount,
       updatedAt: new Date().toISOString()
     }
   : {
       ...summary,
-      availableBalance: summary.availableBalance + amount,
+      availableBalance: roundCashBalance(summary.availableBalance + amount).availableBalance,
       totalTransferredIn: summary.totalTransferredIn + amount,
       updatedAt: new Date().toISOString()
     };
@@ -135,7 +136,7 @@ export const applyTransferDeletionToSummary = (
   amount: number
 ): ShopCashSummary => ({
   ...summary,
-  availableBalance: summary.availableBalance + amount,
+  availableBalance: roundCashBalance(summary.availableBalance + amount).availableBalance,
   totalTransferredOut: summary.totalTransferredOut - amount,
   updatedAt: new Date().toISOString()
 });
@@ -150,7 +151,7 @@ export const applyAdjustmentToSummary = (
   direction: CashAdjustmentDirection
 ): ShopCashSummary => ({
   ...summary,
-  availableBalance: summary.availableBalance + getCashAdjustmentDelta(amount, direction),
+  availableBalance: roundCashBalance(summary.availableBalance, getCashAdjustmentDelta(amount, direction)).availableBalance,
   updatedAt: new Date().toISOString()
 });
 
@@ -166,7 +167,7 @@ export const applyInitializationToSummary = (
   const updatedAt = new Date().toISOString();
   return {
     ...current,
-    availableBalance: current.availableBalance + openingBalance,
+    availableBalance: roundCashBalance(current.availableBalance + openingBalance).availableBalance,
     openingBalance,
     initializedAt: updatedAt,
     initializedBy,

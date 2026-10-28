@@ -1,3 +1,5 @@
+import { cashBalanceFields } from './cashRounding';
+import { requireWholeRupees } from '../utils/wholeRupees';
 import { assertUserInput } from "../inputSecurity";
 import {
   Timestamp,
@@ -86,10 +88,18 @@ export const createTransferId = () => doc(collection(db, SHOP_TRANSFERS)).id;
 export const createAdjustmentId = () => doc(collection(db, CASH_ADJUSTMENTS)).id;
 
 export const getShopCash = async (shopId: ShopId): Promise<ShopCashSummary | null> => {
-  const summarySnapshot = await getDoc(doc(db, SHOP_CASH, shopId));
-  if (!summarySnapshot.exists()) return null;
-
-  const data = summarySnapshot.data();
+  const data = await runTransaction(db, async transaction => {
+    const ref = doc(db, SHOP_CASH, shopId);
+    const snapshot = await transaction.get(ref);
+    if (!snapshot.exists()) return null;
+    const value = snapshot.data();
+    if (!value.initializedAt || Number.isSafeInteger(value.availableBalance)) return value;
+    const fields = cashBalanceFields(transaction, shopId, numberOrZero(value.availableBalance), 0, 'balance-normalization');
+    const update = {...fields, lastCashOperationId: fields.roundingAuditId!, lastCashOperationType: 'rounding', updatedAt: new Date().toISOString()};
+    transaction.update(ref, update);
+    return {...value, ...update};
+  });
+  if (!data) return null;
   return {
     ...createEmptyShopSummary(shopId),
     shopId,
@@ -108,50 +118,24 @@ export const getShopCash = async (shopId: ShopId): Promise<ShopCashSummary | nul
 };
 
 export const initializeShopCash = async (input: CashInitializationInput) => {
-  assertUserInput(input);
-  const batch = writeBatch(db);
-  batch.set(doc(db, CASH_INITIALIZATIONS, input.shopId), {
-    shopId: input.shopId,
-    openingBalance: input.openingBalance,
-    createdAt: serverTimestamp(),
-    createdBy: input.createdBy
+  assertUserInput(input);requireWholeRupees(input.openingBalance, 'Opening cash');
+  await runTransaction(db, async transaction => {
+    const ref=doc(db,SHOP_CASH,input.shopId), before=await transaction.get(ref);
+    const fields=cashBalanceFields(transaction,input.shopId,numberOrZero(before.data()?.availableBalance),input.openingBalance,input.shopId);
+    transaction.set(doc(db,CASH_INITIALIZATIONS,input.shopId),{shopId:input.shopId,openingBalance:input.openingBalance,createdAt:serverTimestamp(),createdBy:input.createdBy});
+    transaction.set(ref,{shopId:input.shopId,...fields,totalCollections:increment(0),totalExpenses:increment(0),totalTransferredIn:increment(0),totalTransferredOut:increment(0),openingBalance:increment(input.openingBalance),lastCashOperationId:input.shopId,lastCashOperationType:'initialization',initializedAt:serverTimestamp(),initializedBy:input.createdBy,updatedAt:new Date().toISOString()},{merge:true});
   });
-  batch.set(doc(db, SHOP_CASH, input.shopId), {
-    shopId: input.shopId,
-    availableBalance: increment(input.openingBalance),
-    totalCollections: increment(0),
-    totalExpenses: increment(0),
-    totalTransferredIn: increment(0),
-    totalTransferredOut: increment(0),
-    openingBalance: increment(input.openingBalance),
-    lastCashOperationId: input.shopId,
-    lastCashOperationType: 'initialization',
-    initializedAt: serverTimestamp(),
-    initializedBy: input.createdBy,
-    updatedAt: new Date().toISOString()
-  }, { merge: true });
-  await batch.commit();
 };
 
 export const createExpense = async (input: CashExpenseInput) => {
-  assertUserInput(input);
-  const batch = writeBatch(db);
-  batch.set(doc(db, CASH_EXPENSES, input.id), {
-    shopId: input.shopId,
-    amount: input.amount,
-    category: input.category,
-    description: input.description.trim(),
-    createdAt: serverTimestamp(),
-    createdBy: input.createdBy
+  assertUserInput(input);requireWholeRupees(input.amount, 'Expense');
+  await runTransaction(db,async transaction=>{
+    const ref=doc(db,SHOP_CASH,input.shopId), snapshot=await transaction.get(ref);
+    if(!snapshot.exists())throw new Error('The shop balance is not initialized.');
+    const fields=cashBalanceFields(transaction,input.shopId,numberOrZero(snapshot.data().availableBalance),-input.amount,input.id);
+    transaction.set(doc(db,CASH_EXPENSES,input.id),{shopId:input.shopId,amount:input.amount,category:input.category,description:input.description.trim(),createdAt:serverTimestamp(),createdBy:input.createdBy});
+    transaction.update(ref,{...fields,totalExpenses:increment(input.amount),lastCashOperationId:input.id,lastCashOperationType:'expense',updatedAt:new Date().toISOString()});
   });
-  batch.update(doc(db, SHOP_CASH, input.shopId), {
-    availableBalance: increment(-input.amount),
-    totalExpenses: increment(input.amount),
-    lastCashOperationId: input.id,
-    lastCashOperationType: 'expense',
-    updatedAt: new Date().toISOString()
-  });
-  await batch.commit();
 };
 
 const mapExpenseRecord = (id: string, data: DocumentData): CashExpenseRecord | null => {
@@ -178,7 +162,7 @@ export const getExpense = async (expenseId: string): Promise<CashExpenseRecord |
 };
 
 export const updateExpense = async (input: CashExpenseUpdateInput) => runTransaction(db, async (transaction) => {
-  assertUserInput(input);
+  assertUserInput(input);requireWholeRupees(input.amount, 'Expense');
   const expenseRef = doc(db, CASH_EXPENSES, input.id);
   const expenseSnapshot = await transaction.get(expenseRef);
   const existing = expenseSnapshot.exists()
@@ -220,7 +204,7 @@ export const updateExpense = async (input: CashExpenseUpdateInput) => runTransac
     updatedBy: input.updatedBy
   });
   transaction.update(summaryRef, {
-    availableBalance: increment(-amountDifference),
+    ...cashBalanceFields(transaction, existing.shopId, numberOrZero(summary.availableBalance), -amountDifference, correctionId),
     totalExpenses: increment(amountDifference),
     lastCashOperationId: correctionId,
     lastCashOperationType: 'expense_edit',
@@ -262,7 +246,7 @@ export const deleteExpense = async (expenseId: string, deletedBy: string) => run
     createdBy: deletedBy
   });
   transaction.update(summaryRef, {
-    availableBalance: increment(existing.amount),
+    ...cashBalanceFields(transaction, existing.shopId, numberOrZero(summarySnapshot.data().availableBalance), existing.amount, correctionId),
     totalExpenses: increment(-existing.amount),
     lastCashOperationId: correctionId,
     lastCashOperationType: 'expense_delete',
@@ -274,31 +258,15 @@ export const deleteExpense = async (expenseId: string, deletedBy: string) => run
 });
 
 export const createTransfer = async (input: ShopTransferInput) => {
-  assertUserInput(input);
-  const batch = writeBatch(db);
-  batch.set(doc(db, SHOP_TRANSFERS, input.id), {
-    fromShopId: input.fromShopId,
-    toShopId: input.toShopId,
-    amount: input.amount,
-    note: input.note.trim(),
-    createdAt: serverTimestamp(),
-    createdBy: input.createdBy
+  assertUserInput(input);requireWholeRupees(input.amount, 'Transfer');
+  await runTransaction(db,async transaction=>{
+    const senderRef=doc(db,SHOP_CASH,input.fromShopId),receiverRef=doc(db,SHOP_CASH,input.toShopId);
+    const [sender,receiver]=await Promise.all([transaction.get(senderRef),transaction.get(receiverRef)]);
+    if(!sender.exists()||!receiver.exists())throw new Error('Both shop balances must be initialized.');
+    transaction.set(doc(db,SHOP_TRANSFERS,input.id),{fromShopId:input.fromShopId,toShopId:input.toShopId,amount:input.amount,note:input.note.trim(),createdAt:serverTimestamp(),createdBy:input.createdBy});
+    transaction.update(senderRef,{...cashBalanceFields(transaction,input.fromShopId,numberOrZero(sender.data().availableBalance),-input.amount,input.id),totalTransferredOut:increment(input.amount),lastCashOperationId:input.id,lastCashOperationType:'transfer',updatedAt:new Date().toISOString()});
+    transaction.update(receiverRef,{...cashBalanceFields(transaction,input.toShopId,numberOrZero(receiver.data().availableBalance),input.amount,input.id),totalTransferredIn:increment(input.amount),lastCashOperationId:input.id,lastCashOperationType:'transfer',updatedAt:new Date().toISOString()});
   });
-  batch.update(doc(db, SHOP_CASH, input.fromShopId), {
-    availableBalance: increment(-input.amount),
-    totalTransferredOut: increment(input.amount),
-    lastCashOperationId: input.id,
-    lastCashOperationType: 'transfer',
-    updatedAt: new Date().toISOString()
-  });
-  batch.update(doc(db, SHOP_CASH, input.toShopId), {
-    availableBalance: increment(input.amount),
-    totalTransferredIn: increment(input.amount),
-    lastCashOperationId: input.id,
-    lastCashOperationType: 'transfer',
-    updatedAt: new Date().toISOString()
-  });
-  await batch.commit();
 };
 
 export const getTransfer = async (transferId: string): Promise<ShopTransferRecord | null> => {
@@ -309,7 +277,7 @@ export const getTransfer = async (transferId: string): Promise<ShopTransferRecor
 };
 
 export const updateTransfer = async (input: ShopTransferUpdateInput) => runTransaction(db, async (transaction) => {
-  assertUserInput(input);
+  assertUserInput(input);requireWholeRupees(input.amount, 'Transfer');
   const transferRef = doc(db, SHOP_TRANSFERS, input.id);
   const transferSnapshot = await transaction.get(transferRef);
   const existing = transferSnapshot.exists()
@@ -323,7 +291,8 @@ export const updateTransfer = async (input: ShopTransferUpdateInput) => runTrans
   if (amountDifference !== 0) {
     const senderRef = doc(db, SHOP_CASH, existing.fromShopId);
     const receiverRef = doc(db, SHOP_CASH, existing.toShopId);
-    const senderSnapshot = await transaction.get(senderRef);
+    const [senderSnapshot, receiverSnapshot] = await Promise.all([transaction.get(senderRef),transaction.get(receiverRef)]);
+    if(!receiverSnapshot.exists()) throw new Error('Both shop balances must be initialized.');
     if (!senderSnapshot.exists()) {
       throw new Error('Both shop balances must be initialized before editing this transfer.');
     }
@@ -339,14 +308,14 @@ export const updateTransfer = async (input: ShopTransferUpdateInput) => runTrans
     }
 
     transaction.update(senderRef, {
-      availableBalance: increment(-amountDifference),
+      ...cashBalanceFields(transaction, existing.fromShopId, numberOrZero(sender.availableBalance), -amountDifference, input.id),
       totalTransferredOut: increment(amountDifference),
       lastCashOperationId: input.id,
       lastCashOperationType: 'transfer_edit',
       updatedAt
     });
     transaction.update(receiverRef, {
-      availableBalance: increment(amountDifference),
+      ...cashBalanceFields(transaction, existing.toShopId, numberOrZero(receiverSnapshot.data().availableBalance), amountDifference, input.id),
       totalTransferredIn: increment(amountDifference),
       lastCashOperationId: input.id,
       lastCashOperationType: 'transfer_edit',
@@ -400,14 +369,14 @@ export const deleteTransfer = async (transferId: string) => runTransaction(db, a
 
   const updatedAt = new Date().toISOString();
   transaction.update(senderRef, {
-    availableBalance: increment(existing.amount),
+    ...cashBalanceFields(transaction, existing.fromShopId, numberOrZero(sender.availableBalance), existing.amount, existing.id),
     totalTransferredOut: increment(-existing.amount),
     lastCashOperationId: existing.id,
     lastCashOperationType: 'transfer_delete',
     updatedAt
   });
   transaction.update(receiverRef, {
-    availableBalance: increment(-existing.amount),
+    ...cashBalanceFields(transaction, existing.toShopId, numberOrZero(receiver.availableBalance), -existing.amount, existing.id),
     totalTransferredIn: increment(-existing.amount),
     lastCashOperationId: existing.id,
     lastCashOperationType: 'transfer_delete',
@@ -419,24 +388,14 @@ export const deleteTransfer = async (transferId: string) => runTransaction(db, a
 });
 
 export const createCashAdjustment = async (input: CashAdjustmentInput) => {
-  assertUserInput(input);
-  const delta = input.direction === 'add' ? input.amount : -input.amount;
-  const batch = writeBatch(db);
-  batch.set(doc(db, CASH_ADJUSTMENTS, input.id), {
-    shopId: input.shopId,
-    amount: input.amount,
-    direction: input.direction,
-    reason: input.reason.trim(),
-    createdAt: serverTimestamp(),
-    createdBy: input.createdBy
+  assertUserInput(input);requireWholeRupees(input.amount, 'Adjustment');
+  await runTransaction(db,async transaction=>{
+    const ref=doc(db,SHOP_CASH,input.shopId),snapshot=await transaction.get(ref);
+    if(!snapshot.exists())throw new Error('The shop balance is not initialized.');
+    const delta=input.direction==='add'?input.amount:-input.amount;
+    transaction.set(doc(db,CASH_ADJUSTMENTS,input.id),{shopId:input.shopId,amount:input.amount,direction:input.direction,reason:input.reason.trim(),createdAt:serverTimestamp(),createdBy:input.createdBy});
+    transaction.update(ref,{...cashBalanceFields(transaction,input.shopId,numberOrZero(snapshot.data().availableBalance),delta,input.id),lastCashOperationId:input.id,lastCashOperationType:'adjustment',updatedAt:new Date().toISOString()});
   });
-  batch.update(doc(db, SHOP_CASH, input.shopId), {
-    availableBalance: increment(delta),
-    lastCashOperationId: input.id,
-    lastCashOperationType: 'adjustment',
-    updatedAt: new Date().toISOString()
-  });
-  await batch.commit();
 };
 
 const mapExpenseHistory = (snapshot: QueryDocumentSnapshot<DocumentData>): CashHistoryItem => {

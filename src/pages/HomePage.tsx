@@ -2,7 +2,6 @@ import {
   ArrowDownLeft,
   ArrowUpRight,
   CreditCard,
-  Fuel,
   IndianRupee,
   Landmark,
   PackagePlus,
@@ -158,10 +157,6 @@ export const HomePage = () => {
         <button className="quick-action-tile emi-action" type="button" onClick={() => navigate('/emi')} disabled={!canUseBalance}>
           <span className="quick-action-icon" aria-hidden="true"><CreditCard size={28} /></span>
           <span>EMI</span>
-        </button>
-        <button className="quick-action-tile expense-action" type="button" onClick={() => navigate('/history/fuel')}>
-          <span className="quick-action-icon" aria-hidden="true"><Fuel size={29} /></span>
-          <span>Fuel</span>
         </button>
       </section>
 

@@ -2435,3 +2435,9 @@ button:disabled {
     animation-iteration-count: 1 !important;
   }
 }
+
+.fuel-view-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin:18px 0;}
+.fuel-view-actions button{min-height:48px;padding:12px 8px;border:1px solid #c5b881;border-radius:12px;background:#fff8e7;color:#243122;font:inherit;font-weight:700;cursor:pointer;}
+.fuel-view-actions button[aria-pressed=true]{background:#243122;color:#fff8e7;}
+.fuel-view-actions button:focus-visible{outline:3px solid #b68b20;outline-offset:3px;}
+.fuel-view-actions button:disabled{opacity:.6;cursor:wait;}

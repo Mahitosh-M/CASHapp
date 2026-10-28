@@ -1,12 +1,7 @@
-import { useCallback } from 'react';
-import { Navigate, useLocation, useNavigate, useParams } from 'react-router-dom';
-import { MonthlyHistorySections } from '../components/MonthlyHistorySections';
+import { Navigate, useParams } from 'react-router-dom';
+import { CashCategoryHistory } from '../components/CashCategoryHistory';
 import { PageHeader } from '../components/PageHeader';
 import { useAuth } from '../context/AuthContext';
-import {
-  getCashCategoryHistoryMonth,
-  getCashCategoryPreviousHistoryDates
-} from '../services/cashService';
 import type { CashHistoryCategory } from '../types';
 import { getShopName } from '../utils/shops';
 
@@ -24,30 +19,8 @@ const isCashHistoryCategory = (value: string | undefined): value is CashHistoryC
 
 export const CategoryHistoryPage = () => {
   const { category: categoryParam } = useParams<{ category: string }>();
-  const { currentShopId, profile } = useAuth();
-  const location = useLocation();
-  const navigate = useNavigate();
+  const { currentShopId } = useAuth();
   const category = isCashHistoryCategory(categoryParam) ? categoryParam : null;
-
-  const loadMonth = useCallback((start: Date, end: Date) => {
-    if (!category || !currentShopId) return Promise.resolve([]);
-    return getCashCategoryHistoryMonth(currentShopId, category, start, end);
-  }, [category, currentShopId]);
-
-  const loadPreviousDates = useCallback((before: Date) => {
-    if (!category || !currentShopId) return Promise.resolve([]);
-    return getCashCategoryPreviousHistoryDates(currentShopId, category, before);
-  }, [category, currentShopId]);
-
-  const editTransfer = useCallback((transferId: string) => {
-    navigate(`/transfer/${transferId}/edit`, {
-      state: { returnTo: location.pathname }
-    });
-  }, [location.pathname, navigate]);
-
-  const editExpense = useCallback((expenseId: string) => {
-    navigate(`/expense/${expenseId}/edit`, { state: { returnTo: location.pathname } });
-  }, [location.pathname, navigate]);
 
   if (!category) return <Navigate to="/" replace />;
   const details = categoryDetails[category];
@@ -59,15 +32,7 @@ export const CategoryHistoryPage = () => {
         subtitle={`Entries for ${currentShopId ? getShopName(currentShopId) : 'this shop'}`}
         backTo="/"
       />
-      {category === 'fuel' && <p className="notice">Dispatch diesel appears after shop-funded approval or personal reimbursement. Do not enter it a second time.</p>}
-      <MonthlyHistorySections
-        queryKey={`${currentShopId || 'none'}:${category}`}
-        emptyText={details.empty}
-        loadMonth={loadMonth}
-        loadPreviousDates={loadPreviousDates}
-        onEditTransfer={editTransfer}
-        onEditExpense={profile?.role === 'Admin' ? editExpense : undefined}
-      />
+      <CashCategoryHistory category={category} emptyText={details.empty} />
     </div>
   );
 };

@@ -1,6 +1,7 @@
 import { IndianRupee, Save } from 'lucide-react';
 import { useRef, useState, type FormEvent } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { CashCategoryHistory } from '../components/CashCategoryHistory';
 import { AutoGrowTextarea } from '../components/AutoGrowTextarea';
 import { PageHeader } from '../components/PageHeader';
 import { ExpenseCategoryIcon } from '../components/ExpenseCategoryIcon';
@@ -30,9 +31,13 @@ export const ExpensePage = () => {
   const online = useOnlineStatus();
   const navigate = useNavigate();
   const operationId = useRef<string | null>(null);
-  const [category, setCategory] = useState<ExpenseCategory | ''>('');
+  const [params, setParams] = useSearchParams();
+  const selectedCategory = params.get('category');
+  const category: ExpenseCategory | '' = EXPENSE_CATEGORIES.find(option => option.id === selectedCategory)?.id ?? '';
+  const fuelHistory = category === 'fuel' && params.get('view') === 'history';
   const [amountText, setAmountText] = useState('');
-  const [description, setDescription] = useState('');
+  const [description, setDescription] = useState(() => category ? resolveExpenseDetails(category, '').description : '');
+  const [notice, setNotice] = useState('');
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
@@ -78,7 +83,14 @@ export const ExpensePage = () => {
       });
       applyExpenseLocally(amount);
       operationId.current = null;
-      navigate('/', { replace: true, state: { notice: 'Expense added successfully.' } });
+      if (category === 'fuel') {
+        setAmountText('');
+        setDescription('Fuel');
+        setNotice('Fuel expense added successfully.');
+        setParams({ category: 'fuel', view: 'history' }, { replace: true });
+      } else {
+        navigate('/', { replace: true, state: { notice: 'Expense added successfully.' } });
+      }
     } catch (saveError) {
       setError(getFriendlyCashError(saveError, 'expense'));
     } finally {
@@ -90,6 +102,33 @@ export const ExpensePage = () => {
     <div className="page form-page">
       <PageHeader title="Add expense" subtitle={`Available ${formatMoney(summary?.availableBalance ?? 0)}`} />
       {error ? <div className="notice error" role="alert">{error}</div> : null}
+      {notice ? <div className="notice success" role="status">{notice}</div> : null}
+
+      <fieldset className="expense-category-fieldset" disabled={submitting}>
+        <legend>Expense category</legend>
+        <div className="expense-category-grid">
+          {EXPENSE_CATEGORIES.map(option => <button
+            key={option.id}
+            type="button"
+            className={category === option.id ? 'selected' : ''}
+            aria-pressed={category === option.id}
+            onClick={() => {
+              setDescription(current => getExpenseDescriptionForCategory(current, category, option.id));
+              setParams({ category: option.id });
+              setNotice('');
+              resetOperationId();
+            }}
+          ><ExpenseCategoryIcon category={option.id} size={22} /><span>{option.label}</span></button>)}
+        </div>
+      </fieldset>
+
+      {category === 'fuel' && <div className="fuel-view-actions" role="group" aria-label="Fuel actions">
+        <button type="button" aria-pressed={!fuelHistory} disabled={submitting} onClick={() => setParams({ category: 'fuel' })}>Add fuel expense</button>
+        <button type="button" aria-pressed={fuelHistory} disabled={submitting} onClick={() => setParams({ category: 'fuel', view: 'history' })}>Fuel history</button>
+      </div>}
+
+      {fuelHistory ? <CashCategoryHistory category="fuel" emptyText="No paid fuel expenses found." /> : <>
+      {category === 'fuel' && <p className="notice">For a new manual fuel bill only. Diesel already posted by Dispatch is available in Fuel history.</p>}
 
       <form className="cash-form" onSubmit={handleSubmit}>
         <label>
@@ -123,29 +162,6 @@ export const ExpensePage = () => {
           <span className="field-count">{description.length}/{MAX_DESCRIPTION_LENGTH}</span>
         </label>
 
-        <fieldset className="expense-category-fieldset">
-          <legend>Expense category</legend>
-          <div className="expense-category-grid">
-            {EXPENSE_CATEGORIES.map((option) => (
-              <button
-                key={option.id}
-                type="button"
-                className={category === option.id ? 'selected' : ''}
-                aria-pressed={category === option.id}
-                disabled={submitting}
-                onClick={() => {
-                  setDescription((current) => getExpenseDescriptionForCategory(current, category, option.id));
-                  setCategory(option.id);
-                  resetOperationId();
-                }}
-              >
-                <ExpenseCategoryIcon category={option.id} size={22} />
-                <span>{option.label}</span>
-              </button>
-            ))}
-          </div>
-        </fieldset>
-
         <button
           className="primary-button submit-button"
           type="submit"
@@ -154,6 +170,7 @@ export const ExpensePage = () => {
           <Save size={21} /> {submitting ? 'Saving...' : 'Save expense'}
         </button>
       </form>
+      </>}
     </div>
   );
 };
